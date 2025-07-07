@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Goalaroo Deployment Script
-# This script builds and deploys the backend to AWS ECS
+# This script deploys using AWS CodeBuild to avoid architecture issues
 
 set -e
 
@@ -14,9 +14,9 @@ NC='\033[0m' # No Color
 # Configuration
 PROJECT_NAME="goalaroo"
 AWS_REGION="us-east-2"
-ECR_REPO_NAME="${PROJECT_NAME}-app"
 CLUSTER_NAME="${PROJECT_NAME}-cluster"
 SERVICE_NAME="${PROJECT_NAME}-service"
+BUILD_PROJECT_NAME="${PROJECT_NAME}-build"
 
 echo -e "${GREEN}🚀 Starting Goalaroo deployment...${NC}"
 
@@ -26,27 +26,16 @@ if ! command -v aws &> /dev/null; then
     exit 1
 fi
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}❌ Docker is not installed. Please install it first.${NC}"
-    exit 1
-fi
-
 # Check if terraform is installed
 if ! command -v terraform &> /dev/null; then
     echo -e "${RED}❌ Terraform is not installed. Please install it first.${NC}"
     exit 1
 fi
 
-# Get AWS account ID
-AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-ECR_REPO_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}"
-
 echo -e "${YELLOW}📋 Configuration:${NC}"
 echo "  Project: ${PROJECT_NAME}"
 echo "  Region: ${AWS_REGION}"
-echo "  Account: ${AWS_ACCOUNT_ID}"
-echo "  ECR Repo: ${ECR_REPO_URI}"
+echo "  Build Project: ${BUILD_PROJECT_NAME}"
 
 # Step 1: Deploy infrastructure with Terraform
 echo -e "${YELLOW}🏗️  Deploying infrastructure with Terraform...${NC}"
@@ -66,8 +55,8 @@ terraform plan -out=tfplan
 terraform apply tfplan
 
 # Get outputs
-ECR_REPO_URL=$(terraform output -raw ecr_repository_url)
 API_URL=$(terraform output -raw api_url)
+ECR_REPO_URL=$(terraform output -raw ecr_repository_url)
 
 echo -e "${GREEN}✅ Infrastructure deployed successfully!${NC}"
 echo "  API URL: ${API_URL}"
@@ -75,24 +64,36 @@ echo "  ECR Repo: ${ECR_REPO_URL}"
 
 cd ..
 
-# Step 2: Build and push Docker image
-echo -e "${YELLOW}🐳 Building and pushing Docker image...${NC}"
+# Step 2: Start CodeBuild project
+echo -e "${YELLOW}🐳 Starting Docker build on AWS...${NC}"
 
-# Login to ECR
-aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPO_URI}
+# Start the build
+BUILD_ID=$(aws codebuild start-build --project-name ${BUILD_PROJECT_NAME} --region ${AWS_REGION} --query 'build.id' --output text)
 
-# Build image
-echo "Building Docker image..."
-docker build --platform linux/amd64 -t ${ECR_REPO_NAME}:latest backend/
+echo "Build started with ID: ${BUILD_ID}"
 
-# Tag image
-docker tag ${ECR_REPO_NAME}:latest ${ECR_REPO_URI}:latest
+# Wait for build to complete
+echo -e "${YELLOW}⏳ Waiting for build to complete...${NC}"
 
-# Push image
-echo "Pushing image to ECR..."
-docker push ${ECR_REPO_URI}:latest
-
-echo -e "${GREEN}✅ Docker image pushed successfully!${NC}"
+# Use a loop to check build status instead of the wait command
+while true; do
+    BUILD_STATUS=$(aws codebuild batch-get-builds --ids ${BUILD_ID} --region ${AWS_REGION} --query 'builds[0].buildStatus' --output text 2>/dev/null || echo "UNKNOWN")
+    
+    if [ "$BUILD_STATUS" = "SUCCEEDED" ]; then
+        echo -e "${GREEN}✅ Build completed successfully!${NC}"
+        break
+    elif [ "$BUILD_STATUS" = "FAILED" ] || [ "$BUILD_STATUS" = "FAULT" ] || [ "$BUILD_STATUS" = "STOPPED" ] || [ "$BUILD_STATUS" = "TIMED_OUT" ]; then
+        echo -e "${RED}❌ Build failed with status: ${BUILD_STATUS}${NC}"
+        echo "Check the build logs in AWS CodeBuild console"
+        exit 1
+    elif [ "$BUILD_STATUS" = "IN_PROGRESS" ] || [ "$BUILD_STATUS" = "QUEUED" ]; then
+        echo "Build status: ${BUILD_STATUS} - waiting..."
+        sleep 30
+    else
+        echo "Unknown build status: ${BUILD_STATUS} - waiting..."
+        sleep 30
+    fi
+done
 
 # Step 3: Update ECS service
 echo -e "${YELLOW}🔄 Updating ECS service...${NC}"
@@ -131,9 +132,9 @@ echo ""
 echo -e "${YELLOW}📊 Deployment Summary:${NC}"
 echo "  API URL: ${API_URL}"
 echo "  Frontend: https://${PROJECT_NAME}.mcsoko.com"
-echo "  ECR Repo: ${ECR_REPO_URL}"
 echo "  Cluster: ${CLUSTER_NAME}"
 echo "  Service: ${SERVICE_NAME}"
+echo "  Build Project: ${BUILD_PROJECT_NAME}"
 echo ""
 echo -e "${YELLOW}🔧 Next steps:${NC}"
 echo "  1. Deploy the frontend to your hosting provider"
@@ -143,4 +144,5 @@ echo ""
 echo -e "${YELLOW}📋 Useful commands:${NC}"
 echo "  View logs: aws logs tail /ecs/${PROJECT_NAME} --follow"
 echo "  Check service: aws ecs describe-services --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME}"
+echo "  View build logs: aws codebuild batch-get-builds --ids ${BUILD_ID}"
 echo "  Scale service: aws ecs update-service --cluster ${CLUSTER_NAME} --service ${SERVICE_NAME} --desired-count 2" 

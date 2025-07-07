@@ -1,4 +1,4 @@
-# Goalaroo Server-Side Deployment Guide
+# Goalaroo Deployment Guide
 
 This guide will help you deploy Goalaroo with server-side state management while maintaining local storage for offline functionality. The deployment uses AWS services for scalability and reliability.
 
@@ -11,8 +11,9 @@ The deployment includes:
 - **Email Service**: AWS SES for sending magic codes
 - **Load Balancer**: Application Load Balancer with SSL termination
 - **Container Registry**: ECR for Docker image storage
+- **Build System**: AWS CodeBuild for cross-platform Docker builds
 - **Monitoring**: CloudWatch logs and metrics
-- **DNS**: Route53 for domain managementcd 
+- **DNS**: Route53 for domain management
 
 ## 📋 Prerequisites
 
@@ -21,20 +22,12 @@ Before deploying, ensure you have:
 1. **AWS Account** with appropriate permissions
 2. **Domain Name** (e.g., `mcsoko.com`) with Route53 hosted zone
 3. **AWS CLI** installed and configured
-4. **Docker** installed
-5. **Terraform** installed (version >= 1.0)
-6. **Node.js** (for local development)
+4. **Terraform** installed (version >= 1.0)
+5. **GitHub Repository** with your code (for CodeBuild)
 
 ## 🔧 Setup Instructions
 
-### 1. Clone and Prepare the Repository
-
-```bash
-git clone <your-repo-url>
-cd KidGoals
-```
-
-### 2. Configure Terraform Variables
+### 1. Configure Terraform Variables
 
 ```bash
 cd terraform
@@ -44,7 +37,7 @@ cp terraform.tfvars.example terraform.tfvars
 Edit `terraform.tfvars` with your specific values:
 
 ```hcl
-aws_region = "us-east-1"
+aws_region = "us-east-2"
 project_name = "goalaroo"
 domain_name = "mcsoko.com"
 environment = "production"
@@ -58,7 +51,7 @@ Generate a secure JWT secret:
 openssl rand -base64 32
 ```
 
-### 3. Configure AWS Credentials
+### 2. Configure AWS Credentials
 
 Ensure your AWS CLI is configured with appropriate permissions:
 
@@ -69,6 +62,7 @@ aws configure
 Required permissions:
 - ECS (Full access)
 - ECR (Full access)
+- CodeBuild (Full access)
 - DynamoDB (Full access)
 - SES (Full access)
 - Route53 (Full access)
@@ -76,7 +70,7 @@ Required permissions:
 - CloudWatch (Limited - for logs)
 - SSM (Limited - for parameters)
 
-### 4. Deploy the Infrastructure
+### 3. Deploy the Application
 
 Run the deployment script:
 
@@ -86,7 +80,7 @@ Run the deployment script:
 
 This script will:
 1. Deploy all AWS infrastructure using Terraform
-2. Build and push the Docker image to ECR
+2. Start a CodeBuild project to build the Docker image
 3. Deploy the application to ECS
 4. Update the frontend with the new API URL
 
@@ -103,19 +97,17 @@ terraform plan
 terraform apply
 ```
 
-### Step 2: Build and Push Docker Image
+### Step 2: Start CodeBuild
 
 ```bash
-# Get ECR repository URL from Terraform output
-ECR_REPO_URL=$(terraform output -raw ecr_repository_url)
+# Get the build project name from Terraform output
+BUILD_PROJECT_NAME="goalaroo-build"
 
-# Login to ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REPO_URL
+# Start the build
+BUILD_ID=$(aws codebuild start-build --project-name ${BUILD_PROJECT_NAME} --region us-east-2 --query 'build.id' --output text)
 
-# Build and push
-docker build -t goalaroo-app:latest backend/
-docker tag goalaroo-app:latest $ECR_REPO_URL:latest
-docker push $ECR_REPO_URL:latest
+# Wait for completion
+aws codebuild wait build-complete --id ${BUILD_ID} --region us-east-2
 ```
 
 ### Step 3: Update ECS Service
@@ -124,7 +116,8 @@ docker push $ECR_REPO_URL:latest
 aws ecs update-service \
     --cluster goalaroo-cluster \
     --service goalaroo-service \
-    --force-new-deployment
+    --force-new-deployment \
+    --region us-east-2
 ```
 
 ## 🔐 Security Configuration
@@ -161,38 +154,22 @@ aws ecs describe-services \
     --services goalaroo-service
 ```
 
-### Monitor Metrics
+### View Build Logs
 
-- **ECS**: CPU/Memory utilization
-- **ALB**: Request count, response time
-- **DynamoDB**: Read/Write capacity
-- **SES**: Email delivery rates
-
-## 🔄 Data Synchronization
-
-The application implements a hybrid approach:
-
-### Online Mode
-- Data is saved to both local storage and server
-- Real-time synchronization between devices
-- Automatic conflict resolution
-
-### Offline Mode
-- Data is saved locally only
-- Automatic sync when connection is restored
-- No data loss during network issues
-
-### Sync Strategy
-1. **Local First**: Always save to local storage
-2. **Server Sync**: Attempt server sync when online
-3. **Conflict Resolution**: Use timestamp-based resolution
-4. **Background Sync**: Sync in background when connection restored
+```bash
+aws codebuild batch-get-builds --ids BUILD_ID --region us-east-2
+```
 
 ## 🛠️ Troubleshooting
 
 ### Common Issues
 
-#### 1. ECS Service Not Starting
+#### 1. CodeBuild Fails
+- Check the build logs in AWS CodeBuild console
+- Verify the GitHub repository URL in `terraform/codebuild.tf`
+- Ensure the `buildspec.yml` file is in the root of your repository
+
+#### 2. ECS Service Not Starting
 ```bash
 # Check service events
 aws ecs describe-services --cluster goalaroo-cluster --services goalaroo-service
@@ -201,17 +178,17 @@ aws ecs describe-services --cluster goalaroo-cluster --services goalaroo-service
 aws logs tail /ecs/goalaroo --follow
 ```
 
-#### 2. Email Not Sending
+#### 3. Email Not Sending
 - Verify SES domain verification
 - Check SES sending limits
 - Review CloudWatch logs for errors
 
-#### 3. API Not Accessible
+#### 4. API Not Accessible
 - Verify ALB health checks
 - Check security group rules
 - Confirm DNS resolution
 
-#### 4. DynamoDB Errors
+#### 5. DynamoDB Errors
 - Check IAM permissions
 - Verify table names
 - Review CloudWatch logs
@@ -226,13 +203,9 @@ aws ecs update-service \
     --desired-count 2
 ```
 
-#### Scale DynamoDB
-- Tables use on-demand billing (auto-scaling)
-- Monitor CloudWatch metrics for performance
-
 ## 💰 Cost Optimization
 
-### Estimated Monthly Costs (us-east-1)
+### Estimated Monthly Costs (us-east-2)
 - **ECS Fargate**: ~$15-30 (1 task, 0.25 vCPU, 0.5GB RAM)
 - **ALB**: ~$20
 - **DynamoDB**: ~$5-15 (on-demand billing)
@@ -240,28 +213,16 @@ aws ecs update-service \
 - **Route53**: ~$1
 - **CloudWatch**: ~$5-10
 - **ECR**: ~$1-5
+- **CodeBuild**: ~$1-5
 
 **Total**: ~$50-90/month
-
-### Cost Reduction Tips
-1. Use Spot instances for development
-2. Implement auto-scaling based on demand
-3. Monitor and optimize DynamoDB usage
-4. Use CloudWatch alarms for cost monitoring
 
 ## 🔄 Updates and Maintenance
 
 ### Update Application
 ```bash
-# Build new image
-docker build -t goalaroo-app:latest backend/
-
-# Push to ECR
-docker tag goalaroo-app:latest $ECR_REPO_URL:latest
-docker push $ECR_REPO_URL:latest
-
-# Update service
-aws ecs update-service --cluster goalaroo-cluster --service goalaroo-service --force-new-deployment
+# Simply run the deployment script again
+./deploy.sh
 ```
 
 ### Update Infrastructure
@@ -271,46 +232,27 @@ terraform plan
 terraform apply
 ```
 
-### Backup Strategy
-- **DynamoDB**: Point-in-time recovery enabled
-- **Application**: Docker images in ECR
-- **Configuration**: Terraform state files
-
 ## 🧪 Testing
 
 ### Health Check
 ```bash
-curl https://api.yourdomain.com/api/health
+curl https://api.mcsoko.com/api/health
 ```
 
 ### Authentication Test
 ```bash
 # Send magic code
-curl -X POST https://api.yourdomain.com/api/auth/send-code \
+curl -X POST https://api.mcsoko.com/api/auth/send-code \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com"}'
-```
-
-### API Test (with token)
-```bash
-curl -X GET https://api.yourdomain.com/api/user/data \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ## 📚 Additional Resources
 
 - [AWS ECS Documentation](https://docs.aws.amazon.com/ecs/)
+- [AWS CodeBuild Documentation](https://docs.aws.amazon.com/codebuild/)
 - [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 - [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
-- [SES Setup Guide](https://docs.aws.amazon.com/ses/latest/dg/setting-up.html)
-
-## 🆘 Support
-
-For issues or questions:
-1. Check CloudWatch logs first
-2. Review this documentation
-3. Check AWS service status
-4. Create an issue in the repository
 
 ---
 

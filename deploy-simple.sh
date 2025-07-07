@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# Goalaroo AWS Deployment Script
-# This script deploys using AWS CodeBuild to avoid architecture issues
+# Simplified Goalaroo Deployment Script
 
 set -e
 
@@ -18,34 +17,11 @@ CLUSTER_NAME="${PROJECT_NAME}-cluster"
 SERVICE_NAME="${PROJECT_NAME}-service"
 BUILD_PROJECT_NAME="${PROJECT_NAME}-build"
 
-echo -e "${GREEN}🚀 Starting Goalaroo AWS deployment...${NC}"
-
-# Check if AWS CLI is installed
-if ! command -v aws &> /dev/null; then
-    echo -e "${RED}❌ AWS CLI is not installed. Please install it first.${NC}"
-    exit 1
-fi
-
-# Check if terraform is installed
-if ! command -v terraform &> /dev/null; then
-    echo -e "${RED}❌ Terraform is not installed. Please install it first.${NC}"
-    exit 1
-fi
-
-echo -e "${YELLOW}📋 Configuration:${NC}"
-echo "  Project: ${PROJECT_NAME}"
-echo "  Region: ${AWS_REGION}"
-echo "  Build Project: ${BUILD_PROJECT_NAME}"
+echo -e "${GREEN}🚀 Starting Goalaroo deployment...${NC}"
 
 # Step 1: Deploy infrastructure with Terraform
 echo -e "${YELLOW}🏗️  Deploying infrastructure with Terraform...${NC}"
 cd terraform
-
-# Check if terraform.tfvars exists
-if [ ! -f "terraform.tfvars" ]; then
-    echo -e "${RED}❌ terraform.tfvars not found. Please copy terraform.tfvars.example and customize it.${NC}"
-    exit 1
-fi
 
 # Initialize Terraform
 terraform init
@@ -56,9 +32,11 @@ terraform apply tfplan
 
 # Get outputs
 API_URL=$(terraform output -raw api_url)
+ECR_REPO_URL=$(terraform output -raw ecr_repository_url)
 
 echo -e "${GREEN}✅ Infrastructure deployed successfully!${NC}"
 echo "  API URL: ${API_URL}"
+echo "  ECR Repo: ${ECR_REPO_URL}"
 
 cd ..
 
@@ -70,22 +48,35 @@ BUILD_ID=$(aws codebuild start-build --project-name ${BUILD_PROJECT_NAME} --regi
 
 echo "Build started with ID: ${BUILD_ID}"
 
-# Wait for build to complete
+# Step 3: Wait for build to complete with better error handling
 echo -e "${YELLOW}⏳ Waiting for build to complete...${NC}"
-aws codebuild wait build-complete --id ${BUILD_ID} --region ${AWS_REGION}
 
-# Check build status
-BUILD_STATUS=$(aws codebuild batch-get-builds --ids ${BUILD_ID} --region ${AWS_REGION} --query 'builds[0].buildStatus' --output text)
+# Use a loop to check build status
+while true; do
+    # Get build status with error handling
+    BUILD_STATUS_CMD="aws codebuild batch-get-builds --ids ${BUILD_ID} --region ${AWS_REGION} --query 'builds[0].buildStatus' --output text"
+    BUILD_STATUS=$(eval $BUILD_STATUS_CMD 2>/dev/null || echo "UNKNOWN")
+    
+    echo "Current build status: ${BUILD_STATUS}"
+    
+    if [ "$BUILD_STATUS" = "SUCCEEDED" ]; then
+        echo -e "${GREEN}✅ Build completed successfully!${NC}"
+        break
+    elif [ "$BUILD_STATUS" = "FAILED" ] || [ "$BUILD_STATUS" = "FAULT" ] || [ "$BUILD_STATUS" = "STOPPED" ] || [ "$BUILD_STATUS" = "TIMED_OUT" ]; then
+        echo -e "${RED}❌ Build failed with status: ${BUILD_STATUS}${NC}"
+        echo "Check the build logs in AWS CodeBuild console"
+        echo "Build ID: ${BUILD_ID}"
+        exit 1
+    elif [ "$BUILD_STATUS" = "IN_PROGRESS" ] || [ "$BUILD_STATUS" = "QUEUED" ]; then
+        echo "Build in progress... waiting 30 seconds"
+        sleep 30
+    else
+        echo "Unknown build status: ${BUILD_STATUS} - waiting 30 seconds"
+        sleep 30
+    fi
+done
 
-if [ "$BUILD_STATUS" = "SUCCEEDED" ]; then
-    echo -e "${GREEN}✅ Docker build completed successfully!${NC}"
-else
-    echo -e "${RED}❌ Docker build failed with status: ${BUILD_STATUS}${NC}"
-    echo "Check the build logs in AWS CodeBuild console"
-    exit 1
-fi
-
-# Step 3: Update ECS service
+# Step 4: Update ECS service
 echo -e "${YELLOW}🔄 Updating ECS service...${NC}"
 
 # Force new deployment
@@ -97,7 +88,7 @@ aws ecs update-service \
 
 echo -e "${GREEN}✅ ECS service updated!${NC}"
 
-# Step 4: Wait for deployment to complete
+# Step 5: Wait for deployment to complete
 echo -e "${YELLOW}⏳ Waiting for deployment to complete...${NC}"
 
 # Wait for service to be stable
@@ -108,7 +99,7 @@ aws ecs wait services-stable \
 
 echo -e "${GREEN}✅ Deployment completed successfully!${NC}"
 
-# Step 5: Update frontend API URL
+# Step 6: Update frontend API URL
 echo -e "${YELLOW}📝 Updating frontend API URL...${NC}"
 
 # Update the API_BASE_URL in app.js
@@ -125,6 +116,7 @@ echo "  Frontend: https://${PROJECT_NAME}.mcsoko.com"
 echo "  Cluster: ${CLUSTER_NAME}"
 echo "  Service: ${SERVICE_NAME}"
 echo "  Build Project: ${BUILD_PROJECT_NAME}"
+echo "  Build ID: ${BUILD_ID}"
 echo ""
 echo -e "${YELLOW}🔧 Next steps:${NC}"
 echo "  1. Deploy the frontend to your hosting provider"

@@ -1,0 +1,96 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: goalaroo-app
+  ECS_CLUSTER: goalaroo-cluster
+  ECS_SERVICE: goalaroo-service
+  ECS_TASK_DEFINITION: goalaroo-app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        cd backend
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Download task definition
+      run: |
+        aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+        --query taskDefinition > task-definition.json
+
+    - name: Update ECS task definition
+      run: |
+        # Update the image in the task definition
+        jq '.containerDefinitions[0].image = "${{ steps.build-image.outputs.image }}"' task-definition.json > new-task-definition.json
+
+    - name: Deploy to ECS
+      run: |
+        # Register the new task definition
+        aws ecs register-task-definition --cli-input-json file://new-task-definition.json
+        
+        # Update the service
+        aws ecs update-service \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --service ${{ env.ECS_SERVICE }} \
+          --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+          --force-new-deployment
+        
+        # Wait for service to be stable
+        aws ecs wait services-stable \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --services ${{ env.ECS_SERVICE }}
+
+    - name: Update frontend API URL
+      run: |
+        # Get the API URL from Terraform output
+        cd terraform
+        API_URL=$(terraform output -raw api_url)
+        cd ..
+        
+        # Update the API_BASE_URL in app.js
+        sed -i "s|const API_BASE_URL = '.*'|const API_BASE_URL = '${API_URL}'|" app.js
+        
+        # Commit and push the updated frontend
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add app.js
+        git commit -m "Update API URL after deployment" || echo "No changes to commit"
+        git push
+
+    - name: Deployment Status
+      run: |
+        echo "✅ Deployment completed successfully!"
+        echo "🚀 API URL: $(cd terraform && terraform output -raw api_url)"
+        echo "🐳 ECR Repository: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
+        echo "📦 Image Tag: ${{ github.sha }}" 
