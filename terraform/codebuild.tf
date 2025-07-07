@@ -29,7 +29,7 @@ resource "aws_codebuild_project" "app_build" {
 
   source {
     type            = "GITHUB"
-    location        = "https://github.com/mcsoko/KidGoals.git"  # Update with your repo
+    location        = "https://github.com/codewritingrobot/kidgoals.git"  # Update with your repo
     git_clone_depth = 1
     buildspec       = "buildspec.yml"
   }
