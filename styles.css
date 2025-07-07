@@ -1,0 +1,1096 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+    overflow-x: hidden;
+}
+
+/* Screen Management */
+.screen {
+    display: none;
+    min-height: 100vh;
+    padding: 20px;
+    max-width: 414px;
+    margin: 0 auto;
+}
+
+.screen.active {
+    display: block;
+}
+
+/* Authentication Screen */
+.auth-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    text-align: center;
+}
+
+.logo h1 {
+    font-size: 3rem;
+    margin-bottom: 10px;
+    color: white;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.logo p {
+    font-size: 1.2rem;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 40px;
+}
+
+.auth-form, .verify-form {
+    background: white;
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    width: 100%;
+    max-width: 350px;
+}
+
+.verify-form.hidden {
+    display: none;
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 28px;
+}
+
+.form-group:first-of-type {
+    margin-top: 12px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+input[type="email"], input[type="text"], input[type="number"], select {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e1e5e9;
+    border-radius: 12px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #007AFF;
+}
+
+.duration-input {
+    display: flex;
+    gap: 10px;
+}
+
+.duration-input input {
+    flex: 2;
+}
+
+.duration-input select {
+    flex: 1;
+}
+
+/* Button Styles */
+.btn-primary, .btn-secondary, .btn-danger, .btn-icon {
+    padding: 15px 25px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: #007AFF;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056CC;
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background: #f2f2f7;
+    color: #007AFF;
+}
+
+.btn-secondary:hover {
+    background: #e5e5ea;
+}
+
+.btn-danger {
+    background: #ff3b30;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #d70015;
+}
+
+.btn-icon {
+    padding: 10px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    font-size: 18px;
+}
+
+.btn-icon:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+/* Dashboard Styles */
+.dashboard-header {
+    background: white;
+    padding: 20px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.user-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.child-selector {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.child-avatars {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.child-avatar-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0 10px;
+    position: relative;
+}
+
+.child-avatar-emoji {
+    font-size: 2.2rem;
+    border-radius: 50%;
+    background: var(--child-color, #eee);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    cursor: pointer;
+    transition: box-shadow 0.2s;
+    position: relative;
+}
+
+.child-avatar-emoji.selected {
+    box-shadow: 0 0 0 3px #007AFF;
+}
+
+.child-avatar-name {
+    font-size: 0.95rem;
+    color: #333;
+    text-align: center;
+    margin-top: 2px;
+    font-weight: 500;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.child-avatar-edit-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 0.7;
+    transition: opacity 0.2s, background 0.2s;
+    z-index: 3;
+}
+
+.child-avatar-edit-btn:hover {
+    opacity: 1;
+    background: #f0f0f0;
+}
+
+.child-avatar-edit-btn svg {
+    display: block;
+}
+
+.child-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: white;
+    transition: all 0.3s ease;
+    position: relative;
+    background: var(--child-color);
+}
+
+.child-avatar:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.child-avatar.selected {
+    border-color: #007AFF;
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+}
+
+.child-avatar .child-initial {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.child-avatar .child-name {
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: #333;
+    white-space: nowrap;
+    background: white;
+    padding: 2px 6px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.child-avatar:hover .child-name {
+    opacity: 1;
+}
+
+.goals-container {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.goals-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.goals-header h2 {
+    color: #333;
+    font-size: 1.5rem;
+}
+
+/* Goal Card Styles */
+.goal-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 15px;
+    border-left: 4px solid;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.goal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.goal-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.goal-icon {
+    font-size: 1.5rem;
+}
+
+.goal-avatars-row-inline {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-left: 10px;
+    margin-bottom: 0;
+}
+
+/* Story Trail Styles */
+.story-trail {
+    position: relative;
+    margin: 20px 0;
+    padding: 15px 0;
+}
+
+.story-header {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.story-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.story-description {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.story-narrative {
+    font-size: 0.85rem;
+    color: #555;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.trail-container {
+    position: relative;
+    height: 80px;
+    margin: 20px 0;
+    overflow: hidden;
+}
+
+.trail-path {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #e9ecef 0%, #007AFF 50%, #e9ecef 100%);
+    border-radius: 2px;
+    transform: translateY(-50%);
+    /* Create a wavy path effect */
+    clip-path: polygon(
+        0% 50%, 5% 30%, 10% 70%, 15% 20%, 20% 80%, 25% 40%, 30% 60%, 
+        35% 25%, 40% 75%, 45% 35%, 50% 65%, 55% 45%, 60% 55%, 65% 30%, 
+        70% 70%, 75% 20%, 80% 80%, 85% 40%, 90% 60%, 95% 25%, 100% 50%
+    );
+}
+
+.trail-character {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2rem;
+    transition: left 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 10;
+}
+
+.trail-milestones {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    pointer-events: none;
+}
+
+.trail-milestone {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: white;
+    border: 3px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.5s ease;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.trail-milestone.completed {
+    border-color: var(--goal-color, #007AFF);
+    background: var(--goal-color, #007AFF);
+    color: white;
+    animation: milestoneSparkle 0.6s ease-out;
+}
+
+.trail-milestone.current {
+    border-color: var(--goal-color, #007AFF);
+    background: white;
+    color: var(--goal-color, #007AFF);
+    transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.trail-destination {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2.5rem;
+    z-index: 5;
+}
+
+.trail-progress-text {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+@keyframes milestoneSparkle {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+@keyframes characterHop {
+    0%, 100% { transform: translateY(-50%); }
+    50% { transform: translateY(-70%); }
+}
+
+.trail-character.hopping {
+    animation: characterHop 0.6s ease-out;
+}
+
+.trail-character {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.trail-character:hover {
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* Story Popup Styles */
+.story-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4000;
+    animation: popupFadeIn 0.3s ease-out;
+}
+
+.story-popup-content {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 300px;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    animation: popupScaleIn 0.3s ease-out;
+}
+
+.story-popup-character {
+    font-size: 3rem;
+    margin-bottom: 15px;
+}
+
+.story-popup-text {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #333;
+    margin-bottom: 20px;
+    font-style: italic;
+}
+
+.story-popup-close {
+    background: var(--goal-color, #007AFF);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.story-popup-close:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+@keyframes popupFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes popupScaleIn {
+    from { 
+        transform: scale(0.8); 
+        opacity: 0; 
+    }
+    to { 
+        transform: scale(1); 
+        opacity: 1; 
+    }
+}
+
+@keyframes milestoneCelebration {
+    0% { 
+        transform: translate(-50%, -50%) scale(0.3); 
+        opacity: 0; 
+    }
+    50% { 
+        transform: translate(-50%, -50%) scale(1.2); 
+        opacity: 1; 
+    }
+    100% { 
+        transform: translate(-50%, -50%) scale(1); 
+        opacity: 1; 
+    }
+}
+
+.milestone-celebration .celebration-content {
+    text-align: center;
+}
+
+.milestone-celebration .celebration-emoji {
+    font-size: 2rem;
+    margin-bottom: 5px;
+    animation: sparkle 0.6s ease-out;
+}
+
+.milestone-celebration .celebration-text {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+}
+
+@keyframes sparkle {
+    0% { transform: scale(0.5) rotate(0deg); }
+    50% { transform: scale(1.3) rotate(180deg); }
+    100% { transform: scale(1) rotate(360deg); }
+}
+
+.goal-progress {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.progress-circle {
+    position: relative;
+    width: 60px;
+    height: 60px;
+}
+
+.progress-ring {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #e9ecef 0deg, #e9ecef 360deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-fill {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--goal-color, #007AFF) 0deg, var(--goal-color, #007AFF) var(--progress, 0deg), #e9ecef var(--progress, 0deg), #e9ecef 360deg);
+    transition: all 0.3s ease;
+}
+
+.progress-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.progress-emoji {
+    font-size: 1.2rem;
+    margin-bottom: 2px;
+}
+
+.goal-info {
+    flex: 1;
+}
+
+.goal-time {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.goal-encouragement {
+    font-size: 0.8rem;
+    color: #999;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+}
+
+.modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    padding: 36px 32px 32px 32px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    background: #fff;
+    max-width: 420px;
+    margin: 0 auto;
+}
+
+.modal-header {
+    position: relative;
+    padding: 12px 12px 12px 12px;
+    border-bottom: 1px solid #e1e5e9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-header h3 {
+    flex: 1;
+    text-align: center;
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.modal-header .btn-icon {
+    background: #f2f2f7;
+    color: #007AFF;
+    border-radius: 50%;
+    border: none;
+    font-size: 1.2rem;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+    box-shadow: none;
+    position: relative;
+    z-index: 1;
+}
+
+.modal-header .btn-icon.btn-danger {
+    color: #ff3b30;
+    background: #fff0f0;
+}
+
+.modal-header .btn-icon:hover {
+    background: #e5e5ea;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.modal-header .btn-icon.btn-danger:hover {
+    background: #ffeaea;
+    color: #d70015;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #999;
+    padding: 5px;
+}
+
+.close-btn:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.form-actions {
+    margin-top: 32px;
+    display: flex;
+    gap: 16px;
+    justify-content: flex-end;
+}
+
+/* Color and Icon Pickers */
+.color-picker, .icon-picker {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.color-option, .icon-option {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+}
+
+.color-option {
+    background: var(--color);
+}
+
+.color-option.selected, .icon-option.selected {
+    border-color: #007AFF;
+    transform: scale(1.1);
+}
+
+/* Goal Detail Styles */
+.goal-detail-content {
+    padding: 18px 10px 12px 10px;
+    margin: 0 0 4px 0;
+}
+
+.goal-detail-content .goal-avatars-row {
+    margin-bottom: 10px;
+}
+
+.goal-detail-content .story-trail {
+    margin-bottom: 18px;
+}
+
+.goal-detail-content .goal-info {
+    margin-bottom: 18px;
+}
+
+.goal-detail-content .goal-actions {
+    margin-top: 8px;
+    padding-top: 8px;
+    gap: 10px;
+}
+
+.goal-detail-content .goal-actions button {
+    min-width: 90px;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.goal-detail-content .goal-actions button:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transform: translateY(-2px) scale(1.04);
+}
+
+@media (max-width: 480px) {
+    .goal-detail-content {
+        padding: 8px 2px 6px 2px;
+    }
+    .modal-header h3 {
+        font-size: 1rem;
+    }
+    .modal-header .btn-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+}
+
+/* Celebration Styles */
+.celebration {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+}
+
+.celebration.hidden {
+    display: none;
+}
+
+.celebration-content {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    animation: celebrationBounce 0.6s ease-out;
+}
+
+.celebration-emoji {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    animation: celebrationSpin 1s ease-out;
+}
+
+@keyframes celebrationBounce {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes celebrationSpin {
+    0% { transform: rotate(0deg) scale(0.5); }
+    50% { transform: rotate(180deg) scale(1.2); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .screen {
+        padding: 15px;
+    }
+    
+    .auth-form, .verify-form {
+        padding: 20px;
+    }
+    
+    .logo h1 {
+        font-size: 2.5rem;
+    }
+    
+    .goals-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .goal-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+}
+
+/* Status-specific styles */
+.goal-card[data-status="completed"] {
+    border-left-color: #34C759;
+    background: linear-gradient(135deg, #f0fff4 0%, #e6fffa 100%);
+}
+
+.goal-card[data-status="paused"] {
+    border-left-color: #FF9500;
+    background: linear-gradient(135deg, #fff8f0 0%, #fff5e6 100%);
+}
+
+.goal-card[data-status="waiting"] {
+    border-left-color: #AF52DE;
+    background: linear-gradient(135deg, #f8f0ff 0%, #f0e6ff 100%);
+}
+
+/* SVG Trail Styles */
+.trail-svg-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto 10px auto;
+    min-height: 170px;
+    max-width: 350px;
+}
+.trail-svg {
+    width: 100%;
+    height: 160px;
+    display: block;
+    overflow: visible;
+}
+.trail-milestone-svg {
+    transition: filter 0.2s;
+}
+.trail-milestone-svg circle {
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.08));
+}
+.trail-milestone-svg text {
+    pointer-events: none;
+}
+.trail-den-svg {
+    filter: drop-shadow(0 4px 12px rgba(124,74,3,0.18));
+}
+.trail-fox-svg text {
+    filter: drop-shadow(0 2px 8px rgba(255,140,0,0.18));
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.trail-fox-svg text:hover {
+    transform: scale(1.1);
+}
+/* Remove old trail-path and trail-milestone absolute styles */
+.trail-path, .trail-milestones, .trail-milestone {
+    all: unset;
+    display: none !important;
+}
+
+.child-multiselect {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 18px 12px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    justify-items: center;
+}
+
+.child-avatar-selector {
+    min-width: 64px;
+    min-height: 64px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    background: #fff;
+    border: 2px solid transparent;
+    transition: border-color 0.2s, background 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.child-avatar-selector.selected {
+    border-color: #007AFF;
+    background: #eaf4ff;
+}
+
+.child-avatar {
+    font-size: 32px;
+    margin-bottom: 2px;
+    transition: filter 0.2s, opacity 0.2s;
+}
+
+.child-name {
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 2px;
+    text-align: center;
+    word-break: break-word;
+}
+
+.goal-avatars-row {
+    display: flex;
+    gap: 0px;
+    margin-bottom: 6px;
+    justify-content: flex-start;
+    align-items: center;
+    min-height: 28px;
+}
+
+.goal-avatar-emoji {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    background: #eee;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    border: 2px solid #fff;
+}
+
+/* Child option styles for the add goal modal */
+.child-option {
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.child-option:hover {
+    background-color: #f8f9fa;
+}
+
+.child-option label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: background-color 0.2s;
+    margin: 0;
+    width: 100%;
+}
+
+.child-option label:hover {
+    background-color: #f0f0f0;
+}
+
+.child-option input[type="checkbox"] {
+    margin: 0;
+    width: 18px;
+    height: 18px;
+    accent-color: #007AFF;
+} 
