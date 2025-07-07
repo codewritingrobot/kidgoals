@@ -96,7 +96,11 @@ jobs:
                 },
                 {
                   "name": "FRONTEND_URL",
-                  "value": "https://mcsoko.com"
+                  "value": "https://goalaroo.mcsoko.com"
+                },
+                {
+                  "name": "API_URL",
+                  "value": "https://api.mcsoko.com"
                 }
               ],
               "secrets": [
@@ -174,13 +178,8 @@ jobs:
 
     - name: Update frontend API URL
       run: |
-        # Get the API URL from Terraform output
-        cd terraform
-        API_URL=$(terraform output -raw api_url)
-        cd ..
-        
-        # Update the API_BASE_URL in app.js
-        sed -i "s|const API_BASE_URL = '.*'|const API_BASE_URL = '${API_URL}'|" app.js
+        # Update the API_BASE_URL in app.js with the correct API URL
+        sed -i "s|const API_BASE_URL = '.*'|const API_BASE_URL = 'https://api.mcsoko.com'|" app.js
         
         # Commit and push the updated frontend
         git config --local user.email "action@github.com"
@@ -192,6 +191,7 @@ jobs:
     - name: Deployment Status
       run: |
         echo "✅ Deployment completed successfully!"
-        echo "🚀 API URL: $(cd terraform && terraform output -raw api_url)"
+        echo "🚀 API URL: https://api.mcsoko.com"
+        echo "🌐 Frontend URL: https://goalaroo.mcsoko.com"
         echo "🐳 ECR Repository: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
         echo "📦 Image Tag: ${{ github.sha }}" 

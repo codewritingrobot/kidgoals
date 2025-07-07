@@ -15,7 +15,7 @@ PROJECT_NAME="goalaroo"
 AWS_REGION="us-east-2"
 CLUSTER_NAME="${PROJECT_NAME}-cluster"
 SERVICE_NAME="${PROJECT_NAME}-service"
-TASK_DEFINITION="${PROJECT_NAME}-app"
+TASK_DEFINITION="${PROJECT_NAME}-task"
 
 echo -e "${YELLOW}🔍 Checking AWS infrastructure...${NC}"
 
@@ -53,18 +53,18 @@ fi
 echo -e "${YELLOW}📋 Checking IAM roles...${NC}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-if aws iam get-role --role-name ecsTaskExecutionRole --region ${AWS_REGION} >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ IAM role exists: ecsTaskExecutionRole${NC}"
+if aws iam get-role --role-name ${PROJECT_NAME}-ecs-execution-role --region ${AWS_REGION} >/dev/null 2>&1; then
+    echo -e "${GREEN}✅ IAM role exists: ${PROJECT_NAME}-ecs-execution-role${NC}"
 else
-    echo -e "${RED}❌ IAM role not found: ecsTaskExecutionRole${NC}"
+    echo -e "${RED}❌ IAM role not found: ${PROJECT_NAME}-ecs-execution-role${NC}"
     echo "   Run: ./deploy-github.sh to create infrastructure"
     exit 1
 fi
 
-if aws iam get-role --role-name ecsTaskRole --region ${AWS_REGION} >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ IAM role exists: ecsTaskRole${NC}"
+if aws iam get-role --role-name ${PROJECT_NAME}-ecs-task-role --region ${AWS_REGION} >/dev/null 2>&1; then
+    echo -e "${GREEN}✅ IAM role exists: ${PROJECT_NAME}-ecs-task-role${NC}"
 else
-    echo -e "${RED}❌ IAM role not found: ecsTaskRole${NC}"
+    echo -e "${RED}❌ IAM role not found: ${PROJECT_NAME}-ecs-task-role${NC}"
     echo "   Run: ./deploy-github.sh to create infrastructure"
     exit 1
 fi

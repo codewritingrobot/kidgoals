@@ -541,9 +541,39 @@ resource "aws_acm_certificate" "api" {
   }
 }
 
+resource "aws_acm_certificate" "frontend" {
+  domain_name       = "goalaroo.${var.domain_name}"
+  validation_method = "DNS"
+
+  tags = {
+    Name = "${var.project_name}-frontend-certificate"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 resource "aws_route53_record" "api_cert_validation" {
   for_each = {
     for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
+}
+
+resource "aws_route53_record" "frontend_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.frontend.domain_validation_options : dvo.domain_name => {
       name   = dvo.resource_record_name
       record = dvo.resource_record_value
       type   = dvo.resource_record_type
@@ -563,9 +593,26 @@ resource "aws_acm_certificate_validation" "api" {
   validation_record_fqdns = [for record in aws_route53_record.api_cert_validation : record.fqdn]
 }
 
+resource "aws_acm_certificate_validation" "frontend" {
+  certificate_arn         = aws_acm_certificate.frontend.arn
+  validation_record_fqdns = [for record in aws_route53_record.frontend_cert_validation : record.fqdn]
+}
+
 resource "aws_route53_record" "api" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = "api.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.app.dns_name
+    zone_id                = aws_lb.app.zone_id
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_record" "frontend" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "goalaroo.${var.domain_name}"
   type    = "A"
 
   alias {
@@ -602,6 +649,11 @@ output "alb_dns_name" {
 output "api_url" {
   description = "The URL of the API"
   value       = "https://api.${var.domain_name}"
+}
+
+output "frontend_url" {
+  description = "The URL of the frontend"
+  value       = "https://goalaroo.${var.domain_name}"
 }
 
 output "ecr_repository_url" {

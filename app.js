@@ -14,7 +14,7 @@ const ICONS = [
 ];
 
 // API Configuration
-const API_BASE_URL = 'https://api.goalaroo.mcsoko.com'; // Will be set by Terraform
+const API_BASE_URL = 'https://api.mcsoko.com'; // Will be set by Terraform
 const API_ENDPOINTS = {
     SEND_CODE: '/api/auth/send-code',
     VERIFY_CODE: '/api/auth/verify-code',
