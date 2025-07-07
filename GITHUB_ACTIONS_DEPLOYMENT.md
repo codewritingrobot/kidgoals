@@ -27,14 +27,16 @@ Add these secrets:
 - `AWS_ACCESS_KEY_ID` - Your AWS access key
 - `AWS_SECRET_ACCESS_KEY` - Your AWS secret key
 
-### 2. Run the Deployment Script
+### 2. Deploy Infrastructure First
+
+The GitHub Actions workflow expects the ECS cluster and service to already exist. Run this first:
 
 ```bash
 ./deploy-github.sh
 ```
 
 This script will:
-1. Deploy AWS infrastructure with Terraform
+1. Deploy AWS infrastructure with Terraform (creates ECS cluster, service, etc.)
 2. Push changes to GitHub
 3. Trigger the GitHub Actions workflow
 

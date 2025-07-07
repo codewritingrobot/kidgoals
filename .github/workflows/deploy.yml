@@ -44,32 +44,106 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Download task definition
+    - name: Check if task definition exists
+      id: check-task-def
+      run: |
+        if aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Download existing task definition
+      if: steps.check-task-def.outputs.exists == 'true'
       run: |
         aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} \
-        --query taskDefinition > task-definition.json
+        --region ${{ env.AWS_REGION }} --query taskDefinition > task-definition.json
 
-    - name: Update ECS task definition
+    - name: Create new task definition
+      if: steps.check-task-def.outputs.exists == 'false'
+      run: |
+        # Get AWS account ID
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        
+        cat > task-definition.json << EOF
+        {
+          "family": "${{ env.ECS_TASK_DEFINITION }}",
+          "networkMode": "awsvpc",
+          "requiresCompatibilities": ["FARGATE"],
+          "cpu": "256",
+          "memory": "512",
+          "executionRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/ecsTaskExecutionRole",
+          "taskRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/ecsTaskRole",
+          "containerDefinitions": [
+            {
+              "name": "goalaroo-app",
+              "image": "${{ steps.build-image.outputs.image }}",
+              "essential": true,
+              "portMappings": [
+                {
+                  "containerPort": 3000,
+                  "protocol": "tcp"
+                }
+              ],
+              "environment": [
+                {
+                  "name": "NODE_ENV",
+                  "value": "production"
+                }
+              ],
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "/ecs/goalaroo",
+                  "awslogs-region": "${{ env.AWS_REGION }}",
+                  "awslogs-stream-prefix": "ecs"
+                }
+              }
+            }
+          ]
+        }
+        EOF
+
+    - name: Update task definition image
+      if: steps.check-task-def.outputs.exists == 'true'
       run: |
         # Update the image in the task definition
         jq '.containerDefinitions[0].image = "${{ steps.build-image.outputs.image }}"' task-definition.json > new-task-definition.json
 
+    - name: Copy task definition for registration
+      if: steps.check-task-def.outputs.exists == 'true'
+      run: |
+        cp new-task-definition.json task-definition-to-register.json
+
+    - name: Copy task definition for registration (new)
+      if: steps.check-task-def.outputs.exists == 'false'
+      run: |
+        cp task-definition.json task-definition-to-register.json
+
     - name: Deploy to ECS
       run: |
-        # Register the new task definition
-        aws ecs register-task-definition --cli-input-json file://new-task-definition.json
+        # Register the task definition
+        aws ecs register-task-definition --cli-input-json file://task-definition-to-register.json --region ${{ env.AWS_REGION }}
         
-        # Update the service
-        aws ecs update-service \
-          --cluster ${{ env.ECS_CLUSTER }} \
-          --service ${{ env.ECS_SERVICE }} \
-          --task-definition ${{ env.ECS_TASK_DEFINITION }} \
-          --force-new-deployment
-        
-        # Wait for service to be stable
-        aws ecs wait services-stable \
-          --cluster ${{ env.ECS_CLUSTER }} \
-          --services ${{ env.ECS_SERVICE }}
+        # Check if service exists
+        if aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }} --query 'services[0].status' --output text | grep -q "ACTIVE"; then
+          # Update existing service
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
+            --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+          
+          # Wait for service to be stable
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --region ${{ env.AWS_REGION }}
+        else
+          echo "Service does not exist yet. Please run Terraform first to create the infrastructure."
+          exit 1
+        fi
 
     - name: Update frontend API URL
       run: |
