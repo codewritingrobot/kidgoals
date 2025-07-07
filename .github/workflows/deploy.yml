@@ -10,7 +10,7 @@ env:
   ECR_REPOSITORY: goalaroo-app
   ECS_CLUSTER: goalaroo-cluster
   ECS_SERVICE: goalaroo-service
-  ECS_TASK_DEFINITION: goalaroo-app
+  ECS_TASK_DEFINITION: goalaroo-task
 
 jobs:
   deploy:
@@ -72,11 +72,11 @@ jobs:
           "requiresCompatibilities": ["FARGATE"],
           "cpu": "256",
           "memory": "512",
-          "executionRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/ecsTaskExecutionRole",
-          "taskRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/ecsTaskRole",
+          "executionRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/goalaroo-ecs-execution-role",
+          "taskRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/goalaroo-ecs-task-role",
           "containerDefinitions": [
             {
-              "name": "goalaroo-app",
+              "name": "goalaroo-container",
               "image": "${{ steps.build-image.outputs.image }}",
               "essential": true,
               "portMappings": [
@@ -89,6 +89,14 @@ jobs:
                 {
                   "name": "NODE_ENV",
                   "value": "production"
+                },
+                {
+                  "name": "AWS_REGION",
+                  "value": "${{ env.AWS_REGION }}"
+                },
+                {
+                  "name": "FRONTEND_URL",
+                  "value": "https://mcsoko.com"
                 }
               ],
               "logConfiguration": {
