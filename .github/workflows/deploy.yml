@@ -99,6 +99,16 @@ jobs:
                   "value": "https://mcsoko.com"
                 }
               ],
+              "secrets": [
+                {
+                  "name": "JWT_SECRET",
+                  "valueFrom": "arn:aws:ssm:${{ env.AWS_REGION }}:${ACCOUNT_ID}:parameter/goalaroo/jwt-secret"
+                },
+                {
+                  "name": "FROM_EMAIL",
+                  "valueFrom": "arn:aws:ssm:${{ env.AWS_REGION }}:${ACCOUNT_ID}:parameter/goalaroo/from-email"
+                }
+              ],
               "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
@@ -115,18 +125,27 @@ jobs:
     - name: Update task definition image
       if: steps.check-task-def.outputs.exists == 'true'
       run: |
-        # Update the image in the task definition
-        jq '.containerDefinitions[0].image = "${{ steps.build-image.outputs.image }}"' task-definition.json > new-task-definition.json
+        # Update the image in the task definition and clean up metadata fields
+        jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | .containerDefinitions[0].image = "${{ steps.build-image.outputs.image }}"' task-definition.json > new-task-definition.json
+        
+        # Clean up additional problematic fields for FARGATE
+        jq 'del(.containerDefinitions[0].portMappings[0].hostPort, .containerDefinitions[0].mountPoints, .containerDefinitions[0].volumesFrom, .containerDefinitions[0].systemControls, .volumes, .placementConstraints)' new-task-definition.json > cleaned-task-definition.json
 
     - name: Copy task definition for registration
       if: steps.check-task-def.outputs.exists == 'true'
       run: |
-        cp new-task-definition.json task-definition-to-register.json
+        cp cleaned-task-definition.json task-definition-to-register.json
 
     - name: Copy task definition for registration (new)
       if: steps.check-task-def.outputs.exists == 'false'
       run: |
-        cp task-definition.json task-definition-to-register.json
+        # Clean up any metadata fields that might be present
+        jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) // .' task-definition.json > task-definition-to-register.json
+
+    - name: Debug task definition
+      run: |
+        echo "Task definition to register:"
+        cat task-definition-to-register.json
 
     - name: Deploy to ECS
       run: |
