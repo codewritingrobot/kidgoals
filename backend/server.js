@@ -373,6 +373,12 @@ app.post('/api/user/sync', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
     const { localChildren, localGoals, lastSyncTime } = req.body;
+    
+    console.log(`Sync request from ${email}:`, {
+      localChildrenCount: localChildren?.length || 0,
+      localGoalsCount: localGoals?.length || 0,
+      lastSyncTime: lastSyncTime
+    });
 
     // Get server data
     const result = await dynamodb.get({
@@ -382,35 +388,54 @@ app.post('/api/user/sync', authenticateToken, async (req, res) => {
 
     const serverData = result.Item || { children: [], goals: [] };
     const serverLastUpdate = serverData.updatedAt || 0;
+    
+    console.log(`Server data for ${email}:`, {
+      serverChildrenCount: serverData.children?.length || 0,
+      serverGoalsCount: serverData.goals?.length || 0,
+      serverLastUpdate: serverLastUpdate
+    });
 
     // If no lastSyncTime or local data is newer, use local data
     if (!lastSyncTime || lastSyncTime > serverLastUpdate) {
       console.log(`Using local data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
       
+      const newUpdateTime = Date.now();
       await dynamodb.put({
         TableName: TABLES.USER_DATA,
         Item: {
           email: email.toLowerCase(),
           children: localChildren || [],
           goals: localGoals || [],
-          updatedAt: Date.now()
+          updatedAt: newUpdateTime
         }
       }).promise();
 
-      return res.json({
+      const response = {
         children: localChildren || [],
         goals: localGoals || [],
-        lastSyncTime: Date.now()
+        lastSyncTime: newUpdateTime
+      };
+      console.log(`Returning local data for ${email}:`, {
+        childrenCount: response.children.length,
+        goalsCount: response.goals.length,
+        lastSyncTime: response.lastSyncTime
       });
+      return res.json(response);
     }
 
     // Otherwise, return server data
     console.log(`Using server data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
-    res.json({
+    const response = {
       children: serverData.children || [],
       goals: serverData.goals || [],
       lastSyncTime: serverLastUpdate
+    };
+    console.log(`Returning server data for ${email}:`, {
+      childrenCount: response.children.length,
+      goalsCount: response.goals.length,
+      lastSyncTime: response.lastSyncTime
     });
+    res.json(response);
   } catch (error) {
     console.error('Error syncing data:', error);
     res.status(500).json({ error: 'Internal server error' });
