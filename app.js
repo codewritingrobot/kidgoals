@@ -101,6 +101,8 @@ const elements = {
     codeInput: document.getElementById('code-input'),
     sendCodeBtn: document.getElementById('send-code-btn'),
     verifyCodeBtn: document.getElementById('verify-code-btn'),
+    verifyForm: document.querySelector('.verify-form'),
+    backToEmailBtn: document.getElementById('back-to-email-btn'),
     
     // Dashboard elements
     userEmail: document.getElementById('user-email'),
@@ -109,6 +111,7 @@ const elements = {
     addChildBtn: document.getElementById('add-child-btn'),
     addGoalBtn: document.getElementById('add-goal-btn'),
     goalsList: document.getElementById('goals-list'),
+    childAvatars: document.getElementById('child-avatars'),
     
     // Forms
     addChildForm: document.getElementById('add-child-form'),
@@ -120,13 +123,16 @@ const elements = {
     addGoalModal: document.getElementById('add-goal-modal'),
     editChildModal: document.getElementById('edit-child-modal'),
     goalDetailModal: document.getElementById('goal-detail-modal'),
+    confirmModal: document.getElementById('confirm-modal'),
     
-    // Goal detail elements
-    detailTitle: document.getElementById('detail-title'),
-    detailProgress: document.getElementById('detail-progress'),
-    detailProgressText: document.getElementById('detail-progress-text'),
-    detailTimeRemaining: document.getElementById('detail-time-remaining'),
-    detailMilestones: document.getElementById('detail-milestones'),
+    // Pickers
+    childColorPicker: document.getElementById('child-color-picker'),
+    goalIconPicker: document.getElementById('goal-icon-picker'),
+    goalColorPicker: document.getElementById('goal-color-picker'),
+    
+    // Goal detail elements (only those that exist in HTML)
+    detailGoalName: document.getElementById('detail-goal-name'),
+    detailGoalTime: document.getElementById('detail-goal-time'),
     detailEncouragement: document.getElementById('detail-encouragement'),
     
     // Action buttons
@@ -1055,10 +1061,17 @@ function showModal(modalId) {
     modal.classList.add('active');
     // Initialize pickers if needed
     if (modalId === 'add-child-modal') {
-        initializeColorPicker(elements.childColorPicker, COLORS[0]);
-        initializeAvatarPicker(document.getElementById('add-child-avatar-picker'), ICONS[0]);
+        if (elements.childColorPicker) {
+            initializeColorPicker(elements.childColorPicker, COLORS[0]);
+        }
+        const avatarPicker = document.getElementById('add-child-avatar-picker');
+        if (avatarPicker) {
+            initializeAvatarPicker(avatarPicker, ICONS[0]);
+        }
     } else if (modalId === 'add-goal-modal') {
-        initializeColorPicker(elements.goalColorPicker, COLORS[0]);
+        if (elements.goalColorPicker) {
+            initializeColorPicker(elements.goalColorPicker, COLORS[0]);
+        }
         renderChildMultiselect();
         initializeGoalTypeSections();
     }
@@ -1156,6 +1169,11 @@ function renderChildMultiselect() {
 }
 
 function initializeColorPicker(container, defaultColor) {
+    if (!container) {
+        console.warn('initializeColorPicker: container is undefined');
+        return;
+    }
+    
     container.innerHTML = '';
     COLORS.forEach(color => {
         const option = document.createElement('div');
@@ -1173,6 +1191,11 @@ function initializeColorPicker(container, defaultColor) {
 }
 
 function initializeAvatarPicker(container, defaultAvatar) {
+    if (!container) {
+        console.warn('initializeAvatarPicker: container is undefined');
+        return;
+    }
+    
     container.innerHTML = '';
     ICONS.forEach(icon => {
         const btn = document.createElement('button');
@@ -1727,19 +1750,21 @@ function populateGoalDetailModal(goal) {
     const goalChildren = getGoalChildren(goal);
     
     // Update modal content
-    elements.detailGoalName.textContent = goal.name;
+    if (elements.detailGoalName) {
+        elements.detailGoalName.textContent = goal.name;
+    }
+    
     // Render SVG with id for progress fill
     const trailContainer = document.querySelector('#goal-detail-modal .trail-svg-container');
     if (trailContainer) {
         trailContainer.innerHTML = createTrailSVG(goal, progress, true);
     }
+    
     // Now get the progress fill element
     const progressFill = document.getElementById('detail-progress-fill');
     if (progressFill) {
         progressFill.style.strokeDasharray = `${progress * 3.14159}, 100`;
     }
-    if (elements.detailProgressEmoji) elements.detailProgressEmoji.textContent = getProgressEmoji(progress, goal);
-    if (elements.detailProgressText) elements.detailProgressText.textContent = `${Math.round(progress)}%`;
     
     // Update time information
     if (goal.type === 'timer') {
@@ -1760,7 +1785,9 @@ function populateGoalDetailModal(goal) {
     }
     
     // Update encouragement
-    if (elements.detailEncouragement) elements.detailEncouragement.textContent = getEncouragement(progress, goal.type, goal);
+    if (elements.detailEncouragement) {
+        elements.detailEncouragement.textContent = getEncouragement(progress, goal.type, goal);
+    }
     
     // Update children avatars
     const childrenAvatars = goalChildren.map(c => 
@@ -1784,26 +1811,37 @@ function handleEditGoal() {
 
     // Pre-fill the add-goal modal with goal data
     const form = elements.addGoalForm;
+    if (!form) return;
+    
     form.reset();
     form.querySelector('#goal-name').value = goal.name;
+    
     // Set color
-    const colorOptions = elements.goalColorPicker.querySelectorAll('.color-option');
-    colorOptions.forEach(opt => {
-        if (opt.style.getPropertyValue('--color') === goal.color) {
-            opt.classList.add('selected');
-        } else {
-            opt.classList.remove('selected');
-        }
-    });
+    if (elements.goalColorPicker) {
+        const colorOptions = elements.goalColorPicker.querySelectorAll('.color-option');
+        colorOptions.forEach(opt => {
+            if (opt.style.getPropertyValue('--color') === goal.color) {
+                opt.classList.add('selected');
+            } else {
+                opt.classList.remove('selected');
+            }
+        });
+    }
+    
     // Set type
     const typeRadio = form.querySelector(`input[name="goal-type-radio"][value="${goal.type}"]`);
     if (typeRadio) typeRadio.checked = true;
     updateGoalTypeSections(goal.type);
+    
     // Set timer fields if timer
     if (goal.type === 'timer') {
-        form.querySelector('#goal-timer-duration').value = goal.duration || '';
-        form.querySelector('#goal-timer-unit').value = goal.unit || 'minutes';
-        form.querySelector('#goal-timer-direction').value = goal.timerType || 'countdown';
+        const durationInput = form.querySelector('#goal-timer-duration');
+        const unitSelect = form.querySelector('#goal-timer-unit');
+        const directionSelect = form.querySelector('#goal-timer-direction');
+        
+        if (durationInput) durationInput.value = goal.duration || '';
+        if (unitSelect) unitSelect.value = goal.unit || 'minutes';
+        if (directionSelect) directionSelect.value = goal.timerType || 'countdown';
     }
 
     // Show the modal first
@@ -1850,10 +1888,10 @@ function handlePauseGoal() {
     
     if (goal.status === 'active') {
         goal.status = 'paused';
-        elements.pauseGoalBtn.textContent = '▶️ Resume';
+        if (elements.pauseGoalBtn) elements.pauseGoalBtn.textContent = '▶️ Resume';
     } else if (goal.status === 'paused') {
         goal.status = 'active';
-        elements.pauseGoalBtn.textContent = '⏸️ Pause';
+        if (elements.pauseGoalBtn) elements.pauseGoalBtn.textContent = '⏸️ Pause';
     }
     
     saveUserData();
@@ -1866,10 +1904,12 @@ function handleResetGoal() {
     if (!goal) return;
     
     // Show confirmation modal
-    elements.confirmTitle.textContent = 'Reset Goal';
-    elements.confirmMessage.textContent = `Are you sure you want to reset "${goal.name}"? This will start the goal over from the beginning.`;
-    elements.confirmAction.textContent = 'Reset Goal';
-    elements.confirmAction.className = 'btn-secondary';
+    if (elements.confirmTitle) elements.confirmTitle.textContent = 'Reset Goal';
+    if (elements.confirmMessage) elements.confirmMessage.textContent = `Are you sure you want to reset "${goal.name}"? This will start the goal over from the beginning.`;
+    if (elements.confirmAction) {
+        elements.confirmAction.textContent = 'Reset Goal';
+        elements.confirmAction.className = 'btn-secondary';
+    }
     
     // Store the goal ID for the confirmation action
     document.getElementById('confirm-modal').setAttribute('data-action-goal-id', goalId);
@@ -1885,10 +1925,12 @@ function handleDeleteGoal() {
     if (!goal) return;
     
     // Show confirmation modal
-    elements.confirmTitle.textContent = 'Delete Goal';
-    elements.confirmMessage.textContent = `Are you sure you want to delete "${goal.name}"? This action cannot be undone.`;
-    elements.confirmAction.textContent = 'Delete Goal';
-    elements.confirmAction.className = 'btn-danger';
+    if (elements.confirmTitle) elements.confirmTitle.textContent = 'Delete Goal';
+    if (elements.confirmMessage) elements.confirmMessage.textContent = `Are you sure you want to delete "${goal.name}"? This action cannot be undone.`;
+    if (elements.confirmAction) {
+        elements.confirmAction.textContent = 'Delete Goal';
+        elements.confirmAction.className = 'btn-danger';
+    }
     
     // Store the goal ID for the confirmation action
     document.getElementById('confirm-modal').setAttribute('data-action-goal-id', goalId);
