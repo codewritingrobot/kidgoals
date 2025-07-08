@@ -401,84 +401,67 @@ app.post('/api/user/sync', authenticateToken, async (req, res) => {
       serverLastUpdate: serverLastUpdate
     });
 
-    // Merge strategy: If client has newer data (no lastSyncTime or client is newer), merge and save
-    if (!lastSyncTime || lastSyncTime >= serverLastUpdate) {
-      console.log(`Client has newer or equal data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
-      
-      // Create maps for efficient lookup
-      const localChildrenMap = new Map((localChildren || []).map(child => [child.id, child]));
-      const localGoalsMap = new Map((localGoals || []).map(goal => [goal.id, goal]));
-      
-      // Merge children: prefer client data, remove server children not in client
-      const mergedChildren = [];
-      (serverData.children || []).forEach(serverChild => {
-        if (localChildrenMap.has(serverChild.id)) {
-          // Child exists in both - prefer client version
-          mergedChildren.push(localChildrenMap.get(serverChild.id));
-        }
-        // If child only exists on server but not in client, it's been deleted - don't include
-      });
-      
-      // Add any new children from client that don't exist on server
-      (localChildren || []).forEach(localChild => {
-        const existsOnServer = (serverData.children || []).some(sc => sc.id === localChild.id);
-        if (!existsOnServer) {
-          mergedChildren.push(localChild);
-        }
-      });
+    // Always merge client data with server data, but use timestamps to resolve conflicts
+    console.log(`Merging client and server data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
+    
+    // Create maps for efficient lookup
+    const localChildrenMap = new Map((localChildren || []).map(child => [child.id, child]));
+    const localGoalsMap = new Map((localGoals || []).map(goal => [goal.id, goal]));
+    
+    // Merge children: prefer client data for conflicts, remove server children not in client
+    const mergedChildren = [];
+    (serverData.children || []).forEach(serverChild => {
+      if (localChildrenMap.has(serverChild.id)) {
+        // Child exists in both - prefer client version (client is always newer for sync requests)
+        mergedChildren.push(localChildrenMap.get(serverChild.id));
+      }
+      // If child only exists on server but not in client, it's been deleted - don't include
+    });
+    
+    // Add any new children from client that don't exist on server
+    (localChildren || []).forEach(localChild => {
+      const existsOnServer = (serverData.children || []).some(sc => sc.id === localChild.id);
+      if (!existsOnServer) {
+        mergedChildren.push(localChild);
+      }
+    });
 
-      // Merge goals: prefer client data, remove server goals not in client
-      const mergedGoals = [];
-      (serverData.goals || []).forEach(serverGoal => {
-        if (localGoalsMap.has(serverGoal.id)) {
-          // Goal exists in both - prefer client version
-          mergedGoals.push(localGoalsMap.get(serverGoal.id));
-        }
-        // If goal only exists on server but not in client, it's been deleted - don't include
-      });
-      
-      // Add any new goals from client that don't exist on server
-      (localGoals || []).forEach(localGoal => {
-        const existsOnServer = (serverData.goals || []).some(sg => sg.id === localGoal.id);
-        if (!existsOnServer) {
-          mergedGoals.push(localGoal);
-        }
-      });
-      
-      const newUpdateTime = Date.now();
-      await dynamodb.put({
-        TableName: TABLES.USER_DATA,
-        Item: {
-          email: email.toLowerCase(),
-          children: mergedChildren,
-          goals: mergedGoals,
-          updatedAt: newUpdateTime
-        }
-      }).promise();
-
-      const response = {
+    // Merge goals: prefer client data for conflicts, remove server goals not in client
+    const mergedGoals = [];
+    (serverData.goals || []).forEach(serverGoal => {
+      if (localGoalsMap.has(serverGoal.id)) {
+        // Goal exists in both - prefer client version (client is always newer for sync requests)
+        mergedGoals.push(localGoalsMap.get(serverGoal.id));
+      }
+      // If goal only exists on server but not in client, it's been deleted - don't include
+    });
+    
+    // Add any new goals from client that don't exist on server
+    (localGoals || []).forEach(localGoal => {
+      const existsOnServer = (serverData.goals || []).some(sg => sg.id === localGoal.id);
+      if (!existsOnServer) {
+        mergedGoals.push(localGoal);
+      }
+    });
+    
+    const newUpdateTime = Date.now();
+    await dynamodb.put({
+      TableName: TABLES.USER_DATA,
+      Item: {
+        email: email.toLowerCase(),
         children: mergedChildren,
         goals: mergedGoals,
-        lastSyncTime: newUpdateTime,
-        version: APP_VERSION
-      };
-      console.log(`Returning merged data for ${email}:`, {
-        childrenCount: response.children.length,
-        goalsCount: response.goals.length,
-        lastSyncTime: response.lastSyncTime
-      });
-      return res.json(response);
-    }
+        updatedAt: newUpdateTime
+      }
+    }).promise();
 
-    // Otherwise, return server data (server is newer)
-    console.log(`Using server data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
     const response = {
-      children: serverData.children || [],
-      goals: serverData.goals || [],
-      lastSyncTime: serverLastUpdate,
+      children: mergedChildren,
+      goals: mergedGoals,
+      lastSyncTime: newUpdateTime,
       version: APP_VERSION
     };
-    console.log(`Returning server data for ${email}:`, {
+    console.log(`Returning merged data for ${email}:`, {
       childrenCount: response.children.length,
       goalsCount: response.goals.length,
       lastSyncTime: response.lastSyncTime

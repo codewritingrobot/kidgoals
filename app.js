@@ -1306,7 +1306,9 @@ function showModal(modalId) {
         initializeGoalTypeSections();
     }
     if (modalId === 'add-child-modal') {
-        elements.addChildForm.addEventListener('submit', handleAddChildSubmit, { once: true });
+        // Remove any existing event listeners to prevent duplicates
+        elements.addChildForm.removeEventListener('submit', handleAddChildSubmit);
+        elements.addChildForm.addEventListener('submit', handleAddChildSubmit);
     }
     
     // Attach modal close event listeners
@@ -1926,7 +1928,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     elements.sendCodeBtn.addEventListener('click', sendMagicCode);
     elements.verifyCodeBtn.addEventListener('click', verifyCode);
-    elements.addChildForm.addEventListener('submit', handleAddChildSubmit, { once: true });
+    elements.addChildForm.addEventListener('submit', handleAddChildSubmit);
     elements.addGoalForm.addEventListener('submit', function(e) {
         e.preventDefault();
         const formData = new FormData(e.target);
