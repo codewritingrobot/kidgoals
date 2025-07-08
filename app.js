@@ -523,9 +523,9 @@ function formatTimeRemaining(milliseconds, goal = null) {
     
     // Handle waiting goals
     if (goal && goal.status === 'waiting') {
-        if (goal.period === 'daily') {
+        if (goal.type === 'daily') {
             return 'Try again tomorrow!';
-        } else if (goal.period === 'weekly') {
+        } else if (goal.type === 'weekly') {
             return 'Try again next week!';
         }
     }
@@ -564,9 +564,9 @@ function getEncouragement(percentage, type, goal = null) {
 function getProgressEmoji(percentage, goal = null) {
     // Handle waiting goals
     if (goal && goal.status === 'waiting') {
-        if (goal.period === 'daily') {
+        if (goal.type === 'daily') {
             return '🌅';
-        } else if (goal.period === 'weekly') {
+        } else if (goal.type === 'weekly') {
             return '📅';
         }
     }
@@ -1115,7 +1115,7 @@ function createGoalCard(goal) {
                 <div class="trail-svg-container">${createTrailSVG(goal, progress)}</div>
                 <div class="trail-progress-text">
                     ${goal.status === 'waiting' ? 
-                        `Try again ${goal.period === 'daily' ? 'tomorrow' : 'next week'}!` :
+                        `Try again ${goal.type === 'daily' ? 'tomorrow' : 'next week'}!` :
                         `${completedMilestones.length} of ${milestones.length} ${theme.trailItemName}${milestones.length !== 1 ? 's' : ''} collected`
                     }
                 </div>
@@ -1316,7 +1316,8 @@ function createGoal(goalData) {
                 color: goalData.color,
                 status: 'active',
                 startTime: startTime,
-                createdAt: Date.now()
+                createdAt: Date.now(),
+                repeat: goalData.repeat || false
             };
             
             // Add timer-specific properties if it's a timer goal
@@ -1547,6 +1548,118 @@ function playCelebrationSound() {
     }
 }
 
+function completeGoal(goal) {
+    console.log('Goal completed:', goal.name);
+    
+    // Stop the timer for this goal
+    const timer = activeTimers.get(goal.id);
+    if (timer) {
+        clearInterval(timer);
+        activeTimers.delete(goal.id);
+    }
+    
+    // Check if this is a repeating goal
+    if (goal.repeat) {
+        // Set up the next iteration
+        if (goal.type === 'daily') {
+            // Set next start time to tomorrow
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(0, 0, 0, 0);
+            goal.nextStartTime = tomorrow.getTime();
+            goal.status = 'waiting';
+        } else if (goal.type === 'weekly') {
+            // Set next start time to next week
+            const nextWeek = new Date();
+            nextWeek.setDate(nextWeek.getDate() + 7);
+            goal.nextStartTime = getStartOfWeek(nextWeek).getTime();
+            goal.status = 'waiting';
+        } else if (goal.type === 'timer') {
+            // For timer goals, restart immediately
+            goal.startTime = Date.now();
+            goal.status = 'active';
+            startGoalTimer(goal);
+        }
+        
+        // If it's a group goal, update all related goals
+        if (goal.groupId) {
+            goals.filter(g => g.groupId === goal.groupId && g.id !== goal.id).forEach(g => {
+                if (g.repeat) {
+                    if (g.type === 'daily') {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        tomorrow.setHours(0, 0, 0, 0);
+                        g.nextStartTime = tomorrow.getTime();
+                        g.status = 'waiting';
+                    } else if (g.type === 'weekly') {
+                        const nextWeek = new Date();
+                        nextWeek.setDate(nextWeek.getDate() + 7);
+                        g.nextStartTime = getStartOfWeek(nextWeek).getTime();
+                        g.status = 'waiting';
+                    } else if (g.type === 'timer') {
+                        g.startTime = Date.now();
+                        g.status = 'active';
+                        startGoalTimer(g);
+                    }
+                } else {
+                    g.status = 'completed';
+                }
+            });
+        }
+    } else {
+        // Non-repeating goal - mark as completed
+        goal.status = 'completed';
+        
+        // If it's a group goal, mark all related goals as completed
+        if (goal.groupId) {
+            goals.filter(g => g.groupId === goal.groupId).forEach(g => {
+                g.status = 'completed';
+            });
+        }
+    }
+    
+    // Save the updated data
+    saveUserData();
+    
+    // Update the UI
+    renderGoals();
+    
+    // Show completion celebration
+    const theme = STORY_THEMES[goal.themeType || goal.type];
+    const celebration = document.createElement('div');
+    celebration.className = 'goal-completion-celebration';
+    celebration.innerHTML = `
+        <div class="celebration-content">
+            <div class="celebration-emoji">🏆</div>
+            <div class="celebration-text">Goal completed!</div>
+            <div class="celebration-subtext">${goal.name}</div>
+        </div>
+    `;
+    celebration.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 30px;
+        border-radius: 20px;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        z-index: 3000;
+        animation: goalCompletionCelebration 2s ease-out;
+        pointer-events: none;
+        text-align: center;
+    `;
+    document.body.appendChild(celebration);
+    setTimeout(() => {
+        if (celebration.parentNode) {
+            celebration.parentNode.removeChild(celebration);
+        }
+    }, 2000);
+    
+    // Play celebration sound
+    playCelebrationSound();
+}
+
 function showStoryPopup(characterName, story) {
     // Create story popup
     const popup = document.createElement('div');
@@ -1669,12 +1782,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get color
         const color = elements.goalColorPicker.querySelector('.color-option.selected').style.getPropertyValue('--color');
         
+        // Get repeat setting (only for daily/weekly goals)
+        const repeatCheckbox = document.getElementById('repeat-checkbox');
+        const repeat = goalType !== 'timer' && repeatCheckbox ? repeatCheckbox.checked : false;
+        
         // Create goal data object
         const goalData = {
             name: formData.get('goal-name'),
             type: goalType,
             color: color,
-            children: selectedChildren
+            children: selectedChildren,
+            repeat: repeat
         };
         
         // Add timer-specific data if it's a timer goal
@@ -1705,6 +1823,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     g.name = goalData.name;
                     g.type = goalData.type;
                     g.color = goalData.color;
+                    g.repeat = goalData.repeat || false;
                     if (goalType === 'timer') {
                         g.duration = goalData.duration;
                         g.unit = goalData.unit;
@@ -1742,7 +1861,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             status: 'active',
                             startTime: startTime,
                             createdAt: Date.now(),
-                            themeType: goalType === 'timer' ? goalData.timerType : goalData.type
+                            themeType: goalType === 'timer' ? goalData.timerType : goalData.type,
+                            repeat: goalData.repeat || false
                         };
                         if (goalType === 'timer') {
                             newGoal.duration = goalData.duration;
@@ -1937,6 +2057,12 @@ function handleEditGoal() {
         if (durationInput) durationInput.value = goal.duration || '';
         if (unitSelect) unitSelect.value = goal.unit || 'minutes';
         if (directionSelect) directionSelect.value = goal.timerType || 'countdown';
+    }
+    
+    // Set repeat checkbox
+    const repeatCheckbox = form.querySelector('#repeat-checkbox');
+    if (repeatCheckbox) {
+        repeatCheckbox.checked = goal.repeat || false;
     }
 
     // Show the modal first

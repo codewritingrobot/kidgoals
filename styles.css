@@ -618,6 +618,30 @@ input:focus, select:focus {
     }
 }
 
+@keyframes goalCompletionCelebration {
+    0% {
+        transform: translate(-50%, -50%) scale(0.3);
+        opacity: 0;
+    }
+    20% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 1;
+    }
+    40% {
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+    60% {
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+    80% {
+        transform: translate(-50%, -50%) scale(0.98);
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+}
+
 .milestone-celebration .celebration-content {
     text-align: center;
 }
