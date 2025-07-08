@@ -374,7 +374,7 @@ app.post('/api/user/data', authenticateToken, async (req, res) => {
   }
 });
 
-// Sync data (merge local and server data) - Fixed sync logic to return correct data
+// Sync data (merge local and server data) - Fixed sync logic to handle deletions properly
 app.post('/api/user/sync', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
@@ -405,25 +405,43 @@ app.post('/api/user/sync', authenticateToken, async (req, res) => {
     if (!lastSyncTime || lastSyncTime >= serverLastUpdate) {
       console.log(`Client has newer or equal data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
       
-      // Merge children (prefer client data, but keep server data for any missing children)
-      const mergedChildren = [...(serverData.children || [])];
+      // Create maps for efficient lookup
+      const localChildrenMap = new Map((localChildren || []).map(child => [child.id, child]));
+      const localGoalsMap = new Map((localGoals || []).map(goal => [goal.id, goal]));
+      
+      // Merge children: prefer client data, remove server children not in client
+      const mergedChildren = [];
+      (serverData.children || []).forEach(serverChild => {
+        if (localChildrenMap.has(serverChild.id)) {
+          // Child exists in both - prefer client version
+          mergedChildren.push(localChildrenMap.get(serverChild.id));
+        }
+        // If child only exists on server but not in client, it's been deleted - don't include
+      });
+      
+      // Add any new children from client that don't exist on server
       (localChildren || []).forEach(localChild => {
-        const existingIndex = mergedChildren.findIndex(c => c.id === localChild.id);
-        if (existingIndex >= 0) {
-          mergedChildren[existingIndex] = localChild; // Update existing
-        } else {
-          mergedChildren.push(localChild); // Add new
+        const existsOnServer = (serverData.children || []).some(sc => sc.id === localChild.id);
+        if (!existsOnServer) {
+          mergedChildren.push(localChild);
         }
       });
 
-      // Merge goals (prefer client data, but keep server data for any missing goals)
-      const mergedGoals = [...(serverData.goals || [])];
+      // Merge goals: prefer client data, remove server goals not in client
+      const mergedGoals = [];
+      (serverData.goals || []).forEach(serverGoal => {
+        if (localGoalsMap.has(serverGoal.id)) {
+          // Goal exists in both - prefer client version
+          mergedGoals.push(localGoalsMap.get(serverGoal.id));
+        }
+        // If goal only exists on server but not in client, it's been deleted - don't include
+      });
+      
+      // Add any new goals from client that don't exist on server
       (localGoals || []).forEach(localGoal => {
-        const existingIndex = mergedGoals.findIndex(g => g.id === localGoal.id);
-        if (existingIndex >= 0) {
-          mergedGoals[existingIndex] = localGoal; // Update existing
-        } else {
-          mergedGoals.push(localGoal); // Add new
+        const existsOnServer = (serverData.goals || []).some(sg => sg.id === localGoal.id);
+        if (!existsOnServer) {
+          mergedGoals.push(localGoal);
         }
       });
       
@@ -491,4 +509,4 @@ app.listen(PORT, () => {
   console.log(`Goalaroo backend server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Version: ${APP_VERSION}`);
-}); 
+});
