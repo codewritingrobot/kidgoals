@@ -83,6 +83,7 @@ let editingGoalId = null;
 let authToken = null;
 let lastSyncTime = null;
 let isOnline = navigator.onLine;
+let syncInterval = null;
 
 // Session Management
 const SESSION_KEY = 'kidgoals_session';
@@ -93,47 +94,39 @@ const SYNC_TIME_KEY = 'kidgoals_last_sync';
 
 // DOM Elements
 const elements = {
-    // Screens
+    // Auth elements
     authScreen: document.getElementById('auth-screen'),
     dashboardScreen: document.getElementById('dashboard-screen'),
-    
-    // Auth elements
     emailInput: document.getElementById('email-input'),
-    sendCodeBtn: document.getElementById('send-code-btn'),
-    verifyForm: document.querySelector('.verify-form'),
     codeInput: document.getElementById('code-input'),
+    sendCodeBtn: document.getElementById('send-code-btn'),
     verifyCodeBtn: document.getElementById('verify-code-btn'),
-    backToEmailBtn: document.getElementById('back-to-email-btn'),
     
     // Dashboard elements
     userEmail: document.getElementById('user-email'),
     logoutBtn: document.getElementById('logout-btn'),
-    childAvatars: document.getElementById('child-avatars'),
+    syncBtn: document.getElementById('sync-btn'),
     addChildBtn: document.getElementById('add-child-btn'),
     addGoalBtn: document.getElementById('add-goal-btn'),
     goalsList: document.getElementById('goals-list'),
     
-    // Modals
-    addChildModal: document.getElementById('add-child-modal'),
-    addGoalModal: document.getElementById('add-goal-modal'),
-    goalDetailModal: document.getElementById('goal-detail-modal'),
-    confirmModal: document.getElementById('confirm-modal'),
-    
     // Forms
     addChildForm: document.getElementById('add-child-form'),
     addGoalForm: document.getElementById('add-goal-form'),
+    editChildForm: document.getElementById('edit-child-form'),
     
-    // Pickers
-    childColorPicker: document.getElementById('child-color-picker'),
-    goalIconPicker: document.getElementById('goal-icon-picker'),
-    goalColorPicker: document.getElementById('goal-color-picker'),
+    // Modals
+    addChildModal: document.getElementById('add-child-modal'),
+    addGoalModal: document.getElementById('add-goal-modal'),
+    editChildModal: document.getElementById('edit-child-modal'),
+    goalDetailModal: document.getElementById('goal-detail-modal'),
     
     // Goal detail elements
-    detailGoalName: document.getElementById('detail-goal-name'),
-    detailProgressFill: document.getElementById('detail-progress-fill'),
-    detailProgressEmoji: document.getElementById('detail-progress-emoji'),
+    detailTitle: document.getElementById('detail-title'),
+    detailProgress: document.getElementById('detail-progress'),
     detailProgressText: document.getElementById('detail-progress-text'),
-    detailGoalTime: document.getElementById('detail-goal-time'),
+    detailTimeRemaining: document.getElementById('detail-time-remaining'),
+    detailMilestones: document.getElementById('detail-milestones'),
     detailEncouragement: document.getElementById('detail-encouragement'),
     
     // Action buttons
@@ -190,19 +183,29 @@ async function apiCall(endpoint, options = {}) {
 // Network status monitoring
 function updateOnlineStatus() {
     isOnline = navigator.onLine;
-    console.log('Network status:', isOnline ? 'online' : 'offline');
+    console.log('Network status changed:', isOnline ? 'online' : 'offline');
     
-    if (isOnline && currentUser) {
-        // Try to sync when coming back online
+    if (isOnline && authToken && currentUser) {
+        // Trigger immediate sync when coming back online
+        console.log('Coming back online, triggering sync...');
         syncDataWithServer();
+        // Restart periodic sync
+        startPeriodicSync();
+    } else if (!isOnline) {
+        // Stop periodic sync when going offline
+        stopPeriodicSync();
     }
 }
 
 // Data synchronization
 async function syncDataWithServer() {
-    if (!isOnline || !currentUser || !authToken) return;
+    if (!isOnline || !currentUser || !authToken) {
+        console.log('Cannot sync: offline or not authenticated');
+        return;
+    }
 
     try {
+        console.log('Starting data sync with server...');
         const localData = loadLocalData();
         const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
             method: 'POST',
@@ -213,25 +216,39 @@ async function syncDataWithServer() {
             })
         });
 
-        // Update local data with server response
-        children = response.children || [];
-        goals = response.goals || [];
-        lastSyncTime = response.lastSyncTime;
+        // Check if server data is different from current data
+        const serverChildren = response.children || [];
+        const serverGoals = response.goals || [];
+        const serverSyncTime = response.lastSyncTime;
         
-        // Save to local storage
-        saveLocalData();
-        saveSyncTime();
+        const childrenChanged = JSON.stringify(children) !== JSON.stringify(serverChildren);
+        const goalsChanged = JSON.stringify(goals) !== JSON.stringify(serverGoals);
         
-        // Restart timers
-        restartTimers();
+        if (childrenChanged || goalsChanged) {
+            console.log('Server data updated, refreshing local data...');
+            children = serverChildren;
+            goals = serverGoals;
+            lastSyncTime = serverSyncTime;
+            
+            // Save to local storage
+            saveLocalData();
+            saveSyncTime();
+            
+            // Restart timers
+            restartTimers();
+            
+            // Update UI
+            renderChildAvatars();
+            renderGoals();
+            
+            console.log(`Sync completed: ${children.length} children, ${goals.length} goals`);
+        } else {
+            console.log('Data already in sync with server');
+        }
         
-        // Update UI
-        renderGoals();
-        
-        console.log('Data synced successfully');
     } catch (error) {
         console.error('Failed to sync data:', error);
-        // Continue with local data
+        // Continue with local data - don't throw error to avoid breaking the app
     }
 }
 
@@ -254,6 +271,31 @@ function loadSyncTime() {
 function saveSyncTime() {
     if (lastSyncTime) {
         localStorage.setItem(SYNC_TIME_KEY, lastSyncTime.toString());
+    }
+}
+
+// Start periodic sync when user is authenticated
+function startPeriodicSync() {
+    if (syncInterval) {
+        clearInterval(syncInterval);
+    }
+    
+    if (isOnline && authToken && currentUser) {
+        console.log('Starting periodic sync (every 30 seconds)');
+        syncInterval = setInterval(() => {
+            if (isOnline && authToken && currentUser) {
+                syncDataWithServer();
+            }
+        }, 30000); // Sync every 30 seconds
+    }
+}
+
+// Stop periodic sync
+function stopPeriodicSync() {
+    if (syncInterval) {
+        clearInterval(syncInterval);
+        syncInterval = null;
+        console.log('Stopped periodic sync');
     }
 }
 
@@ -602,6 +644,9 @@ async function verifyCode() {
         // Load user data
         await loadUserData();
         
+        // Start periodic sync
+        startPeriodicSync();
+        
         // Show dashboard
         showDashboard();
         
@@ -614,20 +659,19 @@ async function verifyCode() {
 }
 
 function logout() {
-    // Clear timers
-    activeTimers.forEach(timer => clearInterval(timer));
-    activeTimers.clear();
+    // Stop periodic sync
+    stopPeriodicSync();
     
-    // Clear session and selected child
+    // Clear session
     clearSession();
-    saveSelectedChild(null);
     
-    // Clear state
+    // Reset state
     currentUser = null;
     authToken = null;
     children = [];
     goals = [];
     selectedChildId = null;
+    lastSyncTime = null;
     
     // Show auth screen
     showAuthScreen();
@@ -636,57 +680,119 @@ function logout() {
 // Data Management Functions
 async function loadUserData() {
     try {
-        // Try to load from server first
-        if (isOnline && authToken) {
-            const serverData = await apiCall(API_ENDPOINTS.GET_DATA);
-            children = serverData.children || [];
-            goals = serverData.goals || [];
-            lastSyncTime = Date.now();
+        // If we have a valid session and are online, sync with server
+        if (isOnline && authToken && currentUser) {
+            console.log('Loading data from server...');
+            
+            // Try to sync with server first
+            const localData = loadLocalData();
+            const lastSync = loadSyncTime();
+            
+            try {
+                const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        localChildren: localData.children || [],
+                        localGoals: localData.goals || [],
+                        lastSyncTime: lastSync
+                    })
+                });
+
+                // Update with server data
+                children = response.children || [];
+                goals = response.goals || [];
+                lastSyncTime = response.lastSyncTime;
+                
+                console.log('Data synced from server successfully');
+            } catch (syncError) {
+                console.warn('Sync failed, trying direct data fetch:', syncError);
+                
+                // Fallback to direct data fetch
+                try {
+                    const serverData = await apiCall(API_ENDPOINTS.GET_DATA);
+                    children = serverData.children || [];
+                    goals = serverData.goals || [];
+                    lastSyncTime = Date.now();
+                    console.log('Data loaded directly from server');
+                } catch (fetchError) {
+                    console.error('Failed to fetch from server:', fetchError);
+                    throw fetchError;
+                }
+            }
         } else {
-            // Fall back to local data
+            // Offline or no auth - load from local storage
+            console.log('Loading data from local storage (offline/no auth)');
             const localData = loadLocalData();
             children = localData.children || [];
             goals = localData.goals || [];
             lastSyncTime = loadSyncTime();
         }
         
-        // Save to local storage
+        // Always save to local storage after loading
         saveLocalData();
         saveSyncTime();
         
         // Restore timers
         restartTimers();
+        
+        console.log(`Loaded ${children.length} children and ${goals.length} goals`);
+        
     } catch (error) {
         console.error('Error loading user data:', error);
+        
         // Fall back to local data
         const localData = loadLocalData();
         children = localData.children || [];
         goals = localData.goals || [];
         lastSyncTime = loadSyncTime();
+        
+        // Save current state to local storage
+        saveLocalData();
+        saveSyncTime();
+        
         restartTimers();
+        
+        console.log(`Fell back to local data: ${children.length} children and ${goals.length} goals`);
     }
 }
 
 async function saveUserData() {
-    // Always save to local storage first
+    // Always save to local storage first for immediate availability
     saveLocalData();
     
-    // Try to save to server if online
+    // Try to save to server if online and authenticated
     if (isOnline && authToken && currentUser) {
         try {
-            await apiCall(API_ENDPOINTS.SAVE_DATA, {
+            console.log('Saving data to server...');
+            
+            // Use sync endpoint to handle potential conflicts
+            const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
                 method: 'POST',
                 body: JSON.stringify({
-                    children: children,
-                    goals: goals
+                    localChildren: children,
+                    localGoals: goals,
+                    lastSyncTime: lastSyncTime
                 })
             });
-            lastSyncTime = Date.now();
+
+            // Update with server response (in case server had newer data)
+            children = response.children || children;
+            goals = response.goals || goals;
+            lastSyncTime = response.lastSyncTime || Date.now();
+            
+            // Update local storage with final state
+            saveLocalData();
             saveSyncTime();
+            
+            console.log('Data saved to server successfully');
         } catch (error) {
             console.error('Failed to save to server:', error);
-            // Data is still saved locally
+            // Data is still saved locally, will sync when connection is restored
         }
+    } else {
+        console.log('Saving data locally only (offline/no auth)');
+        lastSyncTime = Date.now();
+        saveSyncTime();
     }
 }
 
@@ -1413,10 +1519,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Restore session if available
     const savedSession = loadSession();
     if (savedSession) {
+        console.log('Restoring session for user:', savedSession.user.email);
         currentUser = savedSession.user;
         authToken = savedSession.token;
-        loadUserData();
-        showDashboard();
+        
+        // Load user data and show dashboard
+        loadUserData().then(() => {
+            showDashboard();
+            // Start periodic sync after successful restoration
+            startPeriodicSync();
+        }).catch((error) => {
+            console.error('Failed to load user data after session restoration:', error);
+            // Clear invalid session and show auth screen
+            clearSession();
+            showAuthScreen();
+        });
     }
 
     elements.sendCodeBtn.addEventListener('click', sendMagicCode);
@@ -1553,6 +1670,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     elements.logoutBtn.addEventListener('click', logout);
+    elements.syncBtn.addEventListener('click', () => {
+        if (isOnline && authToken && currentUser) {
+            elements.syncBtn.textContent = '⏳';
+            elements.syncBtn.disabled = true;
+            syncDataWithServer().finally(() => {
+                elements.syncBtn.textContent = '🔄';
+                elements.syncBtn.disabled = false;
+            });
+        } else {
+            alert('Cannot sync: offline or not authenticated');
+        }
+    });
 });
 
 function initializeGoalTypeSections() {
