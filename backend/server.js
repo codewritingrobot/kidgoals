@@ -22,11 +22,39 @@ const dynamodb = new AWS.DynamoDB.DocumentClient();
 const ses = new AWS.SES({ region: process.env.AWS_REGION || 'us-east-1' });
 
 // Middleware
-app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://goalaroo.mcsoko.com',
-  credentials: true
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+
+// CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'https://goalaroo.mcsoko.com',
+      'https://www.goalaroo.mcsoko.com',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+    
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
+
+// Pre-flight requests
+app.options('*', cors(corsOptions));
+
 app.use(express.json({ limit: '10mb' }));
 
 // Rate limiting
@@ -137,7 +165,33 @@ async function sendMagicCodeEmail(email, code) {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  console.log('Health check request from:', req.headers.origin);
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    cors: {
+      origin: req.headers.origin,
+      frontendUrl: process.env.FRONTEND_URL
+    }
+  });
+});
+
+// CORS debug endpoint
+app.get('/api/cors-debug', (req, res) => {
+  console.log('CORS debug request from:', req.headers.origin);
+  res.json({
+    message: 'CORS is working',
+    requestOrigin: req.headers.origin,
+    allowedOrigins: [
+      'https://goalaroo.mcsoko.com',
+      'https://www.goalaroo.mcsoko.com',
+      process.env.FRONTEND_URL
+    ].filter(Boolean),
+    environment: {
+      FRONTEND_URL: process.env.FRONTEND_URL,
+      NODE_ENV: process.env.NODE_ENV
+    }
+  });
 });
 
 // Send magic code
