@@ -2269,9 +2269,37 @@ function updateGoalTypeSections(goalType) {
 }
 
 function openGoalDetail(goalId) {
+    console.log('Opening goal detail for ID:', goalId);
+    
     // Find the goal (could be part of a group)
-    const goal = goals.find(g => g.id === goalId);
-    if (!goal) return;
+    let goal = goals.find(g => g.id === goalId);
+    
+    // If goal not found by ID, try to find it by other properties
+    if (!goal) {
+        console.log('Goal not found by ID, trying alternative lookup...');
+        // Try to find by groupId if the ID might be an old groupId
+        goal = goals.find(g => g.groupId === goalId);
+        
+        // If still not found, try to find by name and childId combination
+        if (!goal) {
+            // This is a fallback - we'll need to get the goal name from the DOM
+            const goalCard = document.querySelector(`[data-goal-id="${goalId}"]`);
+            if (goalCard) {
+                const goalName = goalCard.querySelector('.goal-title')?.textContent;
+                if (goalName) {
+                    goal = goals.find(g => g.name === goalName && g.childId === selectedChildId);
+                    console.log('Found goal by name and childId:', goal);
+                }
+            }
+        }
+    }
+    
+    if (!goal) {
+        console.error('Could not find goal with ID:', goalId);
+        return;
+    }
+    
+    console.log('Found goal for detail view:', goal);
     
     // If this is a group goal, get the representative goal
     const representativeGoal = goal.groupId ? 
