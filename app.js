@@ -487,9 +487,14 @@ function startPeriodicSync() {
         console.log('Starting periodic sync (every 60 seconds)');
         syncInterval = setInterval(() => {
             if (isOnline && authToken && currentUser) {
+                console.log('Periodic sync triggered');
                 syncDataWithServer();
+            } else {
+                console.log('Periodic sync skipped: offline or not authenticated');
             }
         }, 60000); // Sync every 60 seconds to reduce conflicts
+    } else {
+        console.log('Cannot start periodic sync: offline or not authenticated');
     }
 }
 
@@ -2078,6 +2083,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isOnline && authToken && currentUser) {
             elements.syncBtn.textContent = '⏳';
             elements.syncBtn.disabled = true;
+            console.log('Manual sync button clicked');
             syncDataWithServer().finally(() => {
                 elements.syncBtn.textContent = '🔄';
                 elements.syncBtn.disabled = false;
@@ -2408,10 +2414,14 @@ function queueSyncOperation(operation) {
     pendingOperations.set(opId, operation);
     
     console.log(`Queued sync operation ${opId}:`, operation.type);
+    console.log(`Queue length: ${syncQueue.length}, Is syncing: ${isSyncing}`);
     
     // Process queue if not already syncing
     if (!isSyncing) {
+        console.log('Starting queue processing...');
         processSyncQueue();
+    } else {
+        console.log('Queue processing already in progress, operation will be processed later');
     }
     
     return opId;
@@ -2419,9 +2429,11 @@ function queueSyncOperation(operation) {
 
 async function processSyncQueue() {
     if (isSyncing || syncQueue.length === 0) {
+        console.log(`processSyncQueue: ${isSyncing ? 'Already syncing' : 'Queue empty'}`);
         return;
     }
     
+    console.log(`processSyncQueue: Starting to process ${syncQueue.length} operations`);
     isSyncing = true;
     
     try {
@@ -2439,6 +2451,7 @@ async function processSyncQueue() {
                 if (operation.retryCount < 3) {
                     operation.retryCount = (operation.retryCount || 0) + 1;
                     operation.retryDelay = Math.min(1000 * Math.pow(2, operation.retryCount), 10000);
+                    console.log(`Re-queueing operation ${operation.id} for retry ${operation.retryCount} in ${operation.retryDelay}ms`);
                     setTimeout(() => {
                         syncQueue.unshift(operation);
                         if (!isSyncing) {
@@ -2451,8 +2464,10 @@ async function processSyncQueue() {
                 }
             }
         }
+        console.log('processSyncQueue: All operations processed');
     } finally {
         isSyncing = false;
+        console.log('processSyncQueue: Sync lock released');
     }
 }
 
@@ -2460,6 +2475,14 @@ async function performSyncOperation(operation) {
     if (!isOnline || !authToken || !currentUser) {
         throw new Error('Cannot sync: offline or not authenticated');
     }
+    
+    console.log(`performSyncOperation: Starting sync for operation ${operation.id} (${operation.type})`);
+    console.log(`performSyncOperation: Current state - ${children.length} children, ${goals.length} goals`);
+    console.log(`performSyncOperation: Last sync time: ${lastSyncTime ? new Date(lastSyncTime).toLocaleString() : 'Never'}`);
+    
+    // Store current state before sync for comparison
+    const preSyncChildren = [...children];
+    const preSyncGoals = [...goals];
     
     const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
         method: 'POST',
@@ -2470,10 +2493,59 @@ async function performSyncOperation(operation) {
         })
     });
     
+    console.log(`performSyncOperation: Server response - ${response.children?.length || 0} children, ${response.goals?.length || 0} goals`);
+    
     // Update local state with server response
     children = response.children || children;
     goals = response.goals || goals;
     lastSyncTime = response.lastSyncTime || Date.now();
+    
+    console.log(`performSyncOperation: After server update - ${children.length} children, ${goals.length} goals`);
+    
+    // Check if any local items were lost during sync
+    const lostChildren = preSyncChildren.filter(child => 
+        !children.some(c => c.id === child.id)
+    );
+    const lostGoals = preSyncGoals.filter(goal => 
+        !goals.some(g => g.id === goal.id)
+    );
+    
+    // If items were lost, add them back (this handles timing issues)
+    if (lostChildren.length > 0 || lostGoals.length > 0) {
+        console.warn('Items lost during sync, restoring:', {
+            lostChildren: lostChildren.length,
+            lostGoals: lostGoals.length
+        });
+        
+        children = [...children, ...lostChildren];
+        goals = [...goals, ...lostGoals];
+        
+        console.log(`performSyncOperation: After restoration - ${children.length} children, ${goals.length} goals`);
+        
+        // Re-sync with the restored data
+        try {
+            console.log('performSyncOperation: Retrying sync with restored data...');
+            const retryResponse = await apiCall(API_ENDPOINTS.SYNC_DATA, {
+                method: 'POST',
+                body: JSON.stringify({
+                    localChildren: children,
+                    localGoals: goals,
+                    lastSyncTime: lastSyncTime
+                })
+            });
+            
+            children = retryResponse.children || children;
+            goals = retryResponse.goals || goals;
+            lastSyncTime = retryResponse.lastSyncTime || Date.now();
+            
+            console.log(`performSyncOperation: After retry - ${children.length} children, ${goals.length} goals`);
+        } catch (retryError) {
+            console.error('Retry sync failed:', retryError);
+            // Keep the restored data even if retry fails
+        }
+    } else {
+        console.log('performSyncOperation: No items lost during sync');
+    }
     
     // Save to local storage
     saveLocalData();
@@ -2483,11 +2555,14 @@ async function performSyncOperation(operation) {
     renderChildAvatars();
     renderGoals();
     
+    console.log(`performSyncOperation: Sync completed successfully for operation ${operation.id}`);
     return response;
 }
 
 // Optimistic update helper
 function optimisticUpdate(updateFn, syncOperation = null) {
+    console.log('Optimistic update called with operation:', syncOperation?.type || 'default');
+    
     // Apply the update immediately for responsive UI
     const result = updateFn();
     
@@ -2496,9 +2571,11 @@ function optimisticUpdate(updateFn, syncOperation = null) {
     
     // Queue sync operation if provided
     if (syncOperation) {
+        console.log('Queueing specific sync operation:', syncOperation.type);
         queueSyncOperation(syncOperation);
     } else {
         // Default sync operation
+        console.log('Queueing default sync operation');
         queueSyncOperation({
             type: 'data_update',
             retryCount: 0
