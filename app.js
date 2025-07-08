@@ -2549,6 +2549,10 @@ async function createChildOnServer(child) {
     goals = response.goals || [];
     lastSyncTime = response.lastSyncTime || Date.now();
     
+    // Fix any goals with old format
+    console.log('About to fix goals from server response (createChild)...');
+    goals = fixGoalFormat(goals);
+    
     // Save to local storage
     saveLocalData();
     saveSyncTime();
@@ -2578,6 +2582,10 @@ async function updateChildOnServer(child) {
     goals = response.goals || [];
     lastSyncTime = response.lastSyncTime || Date.now();
     
+    // Fix any goals with old format
+    console.log('About to fix goals from server response (updateChild)...');
+    goals = fixGoalFormat(goals);
+    
     // Save to local storage
     saveLocalData();
     saveSyncTime();
@@ -2606,6 +2614,10 @@ async function deleteChildOnServer(child) {
     children = response.children || [];
     goals = response.goals || [];
     lastSyncTime = response.lastSyncTime || Date.now();
+    
+    // Fix any goals with old format
+    console.log('About to fix goals from server response (deleteChild)...');
+    goals = fixGoalFormat(goals);
     
     // Save to local storage
     saveLocalData();
@@ -2691,6 +2703,10 @@ async function updateGoalOnServer(goal) {
     goals = response.goals || [];
     lastSyncTime = response.lastSyncTime || Date.now();
     
+    // Fix any goals with old format
+    console.log('About to fix goals from server response (updateGoal)...');
+    goals = fixGoalFormat(goals);
+    
     // Save to local storage
     saveLocalData();
     saveSyncTime();
@@ -2719,6 +2735,10 @@ async function deleteGoalOnServer(goal) {
     children = response.children || [];
     goals = response.goals || [];
     lastSyncTime = response.lastSyncTime || Date.now();
+    
+    // Fix any goals with old format
+    console.log('About to fix goals from server response (deleteGoal)...');
+    goals = fixGoalFormat(goals);
     
     // Save to local storage
     saveLocalData();
