@@ -2470,8 +2470,16 @@ function handleResetGoal() {
 
 function handleDeleteGoal() {
     const goalId = document.getElementById('goal-detail-modal').getAttribute('data-current-goal-id');
+    console.log('Looking for goal with ID:', goalId);
+    console.log('Available goals:', goals.map(g => ({ id: g.id, name: g.name, childId: g.childId, groupId: g.groupId })));
+    
     const goal = goals.find(g => g.id === goalId);
-    if (!goal) return;
+    if (!goal) {
+        console.error('Goal not found with ID:', goalId);
+        return;
+    }
+    
+    console.log('Found goal to delete:', goal);
     
     // Show confirmation modal
     if (elements.confirmTitle) elements.confirmTitle.textContent = 'Delete Goal';
@@ -2492,12 +2500,18 @@ function handleDeleteGoal() {
 async function handleConfirmAction() {
     const goalId = document.getElementById('confirm-modal').getAttribute('data-action-goal-id');
     const actionType = document.getElementById('confirm-modal').getAttribute('data-action-type');
+    console.log('Confirm action - goalId:', goalId, 'actionType:', actionType);
+    
     const goal = goals.find(g => g.id === goalId);
     
     if (!goal) {
+        console.error('Goal not found in confirm action with ID:', goalId);
+        console.log('Available goals:', goals.map(g => ({ id: g.id, name: g.name, childId: g.childId, groupId: g.groupId })));
         hideModal('confirm-modal');
         return;
     }
+    
+    console.log('Found goal for action:', goal);
     
     if (actionType === 'reset') {
         // Reset the goal using server operation
@@ -2722,6 +2736,9 @@ async function deleteGoalOnServer(goal) {
     if (!isOnline || !authToken || !currentUser) {
         throw new Error('Cannot delete goal: offline or not authenticated');
     }
+    
+    console.log('Sending delete request to server with goal:', goal);
+    console.log('Goal ID:', goal.id, 'Goal groupId:', goal.groupId);
     
     const response = await apiCall(API_ENDPOINTS.GOALS, {
         method: 'POST',
