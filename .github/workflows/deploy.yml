@@ -31,8 +31,21 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
+    - name: Check for backend changes
+      id: check-backend-changes
+      run: |
+        # Check if backend files have changed
+        if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^backend/"; then
+          echo "backend_changed=true" >> $GITHUB_OUTPUT
+          echo "🔧 Backend changes detected - will rebuild Docker image"
+        else
+          echo "backend_changed=false" >> $GITHUB_OUTPUT
+          echo "📱 Frontend-only changes - skipping backend rebuild"
+        fi
+
     - name: Build, tag, and push image to Amazon ECR
       id: build-image
+      if: steps.check-backend-changes.outputs.backend_changed == 'true'
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
@@ -43,6 +56,15 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Use existing image for frontend-only changes
+      id: use-existing-image
+      if: steps.check-backend-changes.outputs.backend_changed == 'false'
+      run: |
+        # Get the latest image from ECR
+        LATEST_IMAGE=$(aws ecr describe-images --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} --query 'imageDetails[0].imageTags[0]' --output text 2>/dev/null || echo "latest")
+        echo "image=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${LATEST_IMAGE}" >> $GITHUB_OUTPUT
+        echo "📦 Using existing image: ${LATEST_IMAGE}"
 
     - name: Check infrastructure status
       id: check-infrastructure
@@ -86,6 +108,7 @@ jobs:
         fi
 
     - name: Validate infrastructure
+      if: steps.check-backend-changes.outputs.backend_changed == 'true'
       run: |
         if [ "${{ steps.check-infrastructure.outputs.cluster_exists }}" != "true" ]; then
           echo "❌ ECS Cluster does not exist. Please run 'terraform apply' first."
@@ -100,13 +123,13 @@ jobs:
         echo "✅ Infrastructure is ready for deployment"
 
     - name: Download existing task definition
-      if: steps.check-task-def.outputs.exists == 'true'
+      if: steps.check-task-def.outputs.exists == 'true' && steps.check-backend-changes.outputs.backend_changed == 'true'
       run: |
         aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} \
         --region ${{ env.AWS_REGION }} --query taskDefinition > task-definition.json
 
     - name: Create new task definition
-      if: steps.check-task-def.outputs.exists == 'false'
+      if: steps.check-task-def.outputs.exists == 'false' && steps.check-backend-changes.outputs.backend_changed == 'true'
       run: |
         # Get AWS account ID
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -173,7 +196,7 @@ jobs:
         EOF
 
     - name: Update task definition image
-      if: steps.check-task-def.outputs.exists == 'true'
+      if: steps.check-task-def.outputs.exists == 'true' && steps.check-backend-changes.outputs.backend_changed == 'true'
       run: |
         # Update the image in the task definition and clean up metadata fields
         jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | .containerDefinitions[0].image = "${{ steps.build-image.outputs.image }}"' task-definition.json > new-task-definition.json
@@ -182,22 +205,24 @@ jobs:
         jq 'del(.containerDefinitions[0].portMappings[0].hostPort, .containerDefinitions[0].mountPoints, .containerDefinitions[0].volumesFrom, .containerDefinitions[0].systemControls, .volumes, .placementConstraints)' new-task-definition.json > cleaned-task-definition.json
 
     - name: Copy task definition for registration
-      if: steps.check-task-def.outputs.exists == 'true'
+      if: steps.check-task-def.outputs.exists == 'true' && steps.check-backend-changes.outputs.backend_changed == 'true'
       run: |
         cp cleaned-task-definition.json task-definition-to-register.json
 
     - name: Copy task definition for registration (new)
-      if: steps.check-task-def.outputs.exists == 'false'
+      if: steps.check-task-def.outputs.exists == 'false' && steps.check-backend-changes.outputs.backend_changed == 'true'
       run: |
         # Clean up any metadata fields that might be present
         jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) // .' task-definition.json > task-definition-to-register.json
 
     - name: Debug task definition
+      if: steps.check-backend-changes.outputs.backend_changed == 'true'
       run: |
         echo "Task definition to register:"
         cat task-definition-to-register.json
 
     - name: Deploy to ECS
+      if: steps.check-backend-changes.outputs.backend_changed == 'true'
       run: |
         # Register the task definition
         echo "Registering task definition..."
@@ -250,7 +275,7 @@ jobs:
         fi
 
     - name: Check ECS Service Status (if deployment failed)
-      if: failure()
+      if: failure() && steps.check-backend-changes.outputs.backend_changed == 'true'
       run: |
         echo "🔍 Checking ECS service status and logs..."
         
@@ -314,6 +339,14 @@ jobs:
           --cache-control "max-age=3600" \
           --region ${{ env.AWS_REGION }}
         
+        # Ensure icons are deployed with proper cache headers
+        if [ -d "icons" ]; then
+          echo "📱 Deploying icons with long cache headers..."
+          aws s3 sync icons/ s3://$S3_BUCKET/icons/ \
+            --cache-control "max-age=31536000,immutable" \
+            --region ${{ env.AWS_REGION }}
+        fi
+        
         echo "✅ Frontend files deployed to S3"
         
         # Invalidate CloudFront cache
@@ -325,8 +358,18 @@ jobs:
 
     - name: Deployment Status
       run: |
-        echo "✅ Deployment completed successfully!"
-        echo "🚀 API URL: https://api.mcsoko.com"
-        echo "🌐 Frontend URL: https://goalaroo.mcsoko.com"
-        echo "🐳 ECR Repository: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
-        echo "📦 Image Tag: ${{ github.sha }}" 
+        if [ "${{ steps.check-backend-changes.outputs.backend_changed }}" = "true" ]; then
+          echo "✅ Full deployment completed successfully!"
+          echo "🔧 Backend: Updated and deployed"
+          echo "🌐 Frontend: Updated and deployed"
+          echo "🚀 API URL: https://api.mcsoko.com"
+          echo "🌐 Frontend URL: https://goalaroo.mcsoko.com"
+          echo "🐳 ECR Repository: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
+          echo "📦 Image Tag: ${{ github.sha }}"
+        else
+          echo "✅ Frontend-only deployment completed successfully!"
+          echo "📱 Frontend: Updated and deployed"
+          echo "🔧 Backend: No changes - skipped rebuild"
+          echo "🌐 Frontend URL: https://goalaroo.mcsoko.com"
+          echo "🚀 API URL: https://api.mcsoko.com (unchanged)"
+        fi 
