@@ -383,8 +383,10 @@ app.post('/api/user/sync', authenticateToken, async (req, res) => {
     const serverData = result.Item || { children: [], goals: [] };
     const serverLastUpdate = serverData.updatedAt || 0;
 
-    // If local data is newer, use it
-    if (lastSyncTime && lastSyncTime > serverLastUpdate) {
+    // If no lastSyncTime or local data is newer, use local data
+    if (!lastSyncTime || lastSyncTime > serverLastUpdate) {
+      console.log(`Using local data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
+      
       await dynamodb.put({
         TableName: TABLES.USER_DATA,
         Item: {
@@ -403,6 +405,7 @@ app.post('/api/user/sync', authenticateToken, async (req, res) => {
     }
 
     // Otherwise, return server data
+    console.log(`Using server data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
     res.json({
       children: serverData.children || [],
       goals: serverData.goals || [],

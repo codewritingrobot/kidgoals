@@ -84,6 +84,7 @@ let authToken = null;
 let lastSyncTime = null;
 let isOnline = navigator.onLine;
 let syncInterval = null;
+let isSyncing = false; // Add sync lock to prevent race conditions
 
 // Session Management
 const SESSION_KEY = 'kidgoals_session';
@@ -210,14 +211,22 @@ async function syncDataWithServer() {
         return;
     }
 
+    if (isSyncing) {
+        console.log('Sync already in progress, skipping...');
+        return;
+    }
+
+    isSyncing = true;
+    
     try {
         console.log('Starting data sync with server...');
-        const localData = loadLocalData();
+        
+        // Use current in-memory data, not localStorage data
         const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
             method: 'POST',
             body: JSON.stringify({
-                localChildren: localData.children || [],
-                localGoals: localData.goals || [],
+                localChildren: children || [],
+                localGoals: goals || [],
                 lastSyncTime: lastSyncTime
             })
         });
@@ -255,6 +264,8 @@ async function syncDataWithServer() {
     } catch (error) {
         console.error('Failed to sync data:', error);
         // Continue with local data - don't throw error to avoid breaking the app
+    } finally {
+        isSyncing = false;
     }
 }
 
@@ -287,12 +298,12 @@ function startPeriodicSync() {
     }
     
     if (isOnline && authToken && currentUser) {
-        console.log('Starting periodic sync (every 30 seconds)');
+        console.log('Starting periodic sync (every 60 seconds)');
         syncInterval = setInterval(() => {
             if (isOnline && authToken && currentUser) {
                 syncDataWithServer();
             }
-        }, 30000); // Sync every 30 seconds
+        }, 60000); // Sync every 60 seconds to reduce conflicts
     }
 }
 
@@ -763,13 +774,20 @@ async function loadUserData() {
 }
 
 async function saveUserData() {
+    console.log('saveUserData called with', goals.length, 'goals');
+    
     // Always save to local storage first for immediate availability
     saveLocalData();
+    console.log('Data saved to local storage');
     
     // Try to save to server if online and authenticated
     if (isOnline && authToken && currentUser) {
         try {
             console.log('Saving data to server...');
+            console.log('Current lastSyncTime:', lastSyncTime);
+            
+            // Add a small delay to prevent race conditions with periodic sync
+            await new Promise(resolve => setTimeout(resolve, 200));
             
             // Use sync endpoint to handle potential conflicts
             const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
@@ -781,10 +799,15 @@ async function saveUserData() {
                 })
             });
 
+            console.log('Server response:', response);
+            console.log('Server returned', response.children?.length || 0, 'children and', response.goals?.length || 0, 'goals');
+
             // Update with server response (in case server had newer data)
             children = response.children || children;
             goals = response.goals || goals;
             lastSyncTime = response.lastSyncTime || Date.now();
+            
+            console.log('After server sync:', goals.length, 'goals');
             
             // Update local storage with final state
             saveLocalData();
@@ -1217,6 +1240,9 @@ function createGoal(goalData) {
         return;
     }
     
+    console.log('Creating new goal:', goalData);
+    console.log('Current goals before creation:', goals.length);
+    
     // Create a group ID to link related goals together
     const groupId = generateId();
     
@@ -1259,6 +1285,7 @@ function createGoal(goalData) {
         }
         
         goals.push(goal);
+        console.log('Added goal to array:', goal.id, goal.name);
         
         // Start timer for the goal if it's a timer type
         if (goalData.type === 'timer') {
@@ -1266,11 +1293,16 @@ function createGoal(goalData) {
         }
     });
     
+    console.log('Goals after creation:', goals.length);
+    console.log('About to save user data...');
+    
     saveUserData();
     
     // Update UI
     renderGoals();
     hideModal('add-goal-modal');
+    
+    console.log('Goal creation completed');
 }
 
 function calculateProgress(goal) {
