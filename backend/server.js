@@ -8,6 +8,8 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const validator = require('validator');
+const swaggerUi = require('swagger-ui-express');
+const specs = require('./swagger');
 require('dotenv').config();
 
 const app = express();
@@ -44,6 +46,12 @@ app.use(helmet({
     includeSubDomains: true,
     preload: true
   }
+}));
+
+// Swagger documentation endpoint
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Goalaroo API Documentation'
 }));
 
 // Simple health check endpoint (bypasses CORS for ELB health checks)
@@ -199,7 +207,43 @@ async function sendMagicCodeEmail(email, code) {
   }
 }
 
-// Authentication endpoints
+/**
+ * @swagger
+ * /api/auth/send-code:
+ *   post:
+ *     summary: Send magic code to user's email
+ *     description: Sends a 6-digit magic code to the provided email address for authentication
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthRequest'
+ *     responses:
+ *       200:
+ *         description: Magic code sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Magic code sent successfully"
+ *       400:
+ *         description: Invalid email address
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.post('/api/auth/send-code', async (req, res) => {
   try {
     const { email } = req.body;
@@ -235,6 +279,39 @@ app.post('/api/auth/send-code', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/verify-code:
+ *   post:
+ *     summary: Verify magic code and authenticate user
+ *     description: Verifies the 6-digit magic code and returns a JWT token for authentication
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VerifyCodeRequest'
+ *     responses:
+ *       200:
+ *         description: Authentication successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       400:
+ *         description: Invalid or expired code
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.post('/api/auth/verify-code', async (req, res) => {
   try {
     const { email, code } = req.body;
@@ -312,7 +389,37 @@ app.post('/api/auth/verify-code', async (req, res) => {
   }
 });
 
-// Clean CRUD API for Children
+/**
+ * @swagger
+ * /api/children:
+ *   get:
+ *     summary: Get all children for the authenticated user
+ *     description: Retrieves all children associated with the authenticated user
+ *     tags: [Children]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of children retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Child'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.get('/api/children', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
@@ -330,6 +437,61 @@ app.get('/api/children', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/children:
+ *   post:
+ *     summary: Create a new child
+ *     description: Creates a new child for the authenticated user
+ *     tags: [Children]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, avatar, color]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Child's name
+ *                 minLength: 1
+ *                 maxLength: 50
+ *               avatar:
+ *                 type: string
+ *                 description: Emoji or avatar representation
+ *               color:
+ *                 type: string
+ *                 pattern: '^#[0-9A-Fa-f]{6}$'
+ *                 description: Hex color code for the child
+ *     responses:
+ *       201:
+ *         description: Child created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Child'
+ *       400:
+ *         description: Missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.post('/api/children', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
@@ -377,6 +539,74 @@ app.post('/api/children', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/children/{id}:
+ *   put:
+ *     summary: Update a child
+ *     description: Updates an existing child's information
+ *     tags: [Children]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Child ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Child's name
+ *                 minLength: 1
+ *                 maxLength: 50
+ *               avatar:
+ *                 type: string
+ *                 description: Emoji or avatar representation
+ *               color:
+ *                 type: string
+ *                 pattern: '^#[0-9A-Fa-f]{6}$'
+ *                 description: Hex color code for the child
+ *     responses:
+ *       200:
+ *         description: Child updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Child'
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Child not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.put('/api/children/:id', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
@@ -423,6 +653,47 @@ app.put('/api/children/:id', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/children/{id}:
+ *   delete:
+ *     summary: Delete a child
+ *     description: Deletes a child and all associated goals
+ *     tags: [Children]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Child ID
+ *     responses:
+ *       200:
+ *         description: Child deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Child deleted successfully"
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.delete('/api/children/:id', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
@@ -462,7 +733,37 @@ app.delete('/api/children/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Clean CRUD API for Goals
+/**
+ * @swagger
+ * /api/goals:
+ *   get:
+ *     summary: Get all goals for the authenticated user
+ *     description: Retrieves all goals associated with the authenticated user
+ *     tags: [Goals]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of goals retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Goal'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.get('/api/goals', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
@@ -480,6 +781,49 @@ app.get('/api/goals', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/goals:
+ *   post:
+ *     summary: Create new goals
+ *     description: Creates new goals for one or more children. Creates individual goals for each child in the childIds array.
+ *     tags: [Goals]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateGoalRequest'
+ *     responses:
+ *       201:
+ *         description: Goals created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Goal'
+ *       400:
+ *         description: Missing required fields or invalid data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.post('/api/goals', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
@@ -558,6 +902,90 @@ app.post('/api/goals', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/goals/{id}:
+ *   put:
+ *     summary: Update a goal
+ *     description: Updates an existing goal's information
+ *     tags: [Goals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Goal ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Goal name
+ *               type:
+ *                 type: string
+ *                 enum: [timer, countdown, countup]
+ *                 description: Type of goal
+ *               color:
+ *                 type: string
+ *                 pattern: '^#[0-9A-Fa-f]{6}$'
+ *                 description: Hex color code for the goal
+ *               status:
+ *                 type: string
+ *                 enum: [active, paused, completed, waiting]
+ *                 description: Current status of the goal
+ *               progress:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 100
+ *                 description: Progress percentage
+ *               current:
+ *                 type: number
+ *                 description: Current value for count goals
+ *               completedAt:
+ *                 type: integer
+ *                 format: int64
+ *                 nullable: true
+ *                 description: Timestamp when goal was completed
+ *     responses:
+ *       200:
+ *         description: Goal updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Goal'
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Goal not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.put('/api/goals/:id', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
@@ -604,6 +1032,53 @@ app.put('/api/goals/:id', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/goals/{id}:
+ *   delete:
+ *     summary: Delete a goal
+ *     description: Deletes a goal. If the goal has a groupId, all goals in the group will be deleted.
+ *     tags: [Goals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Goal ID
+ *     responses:
+ *       200:
+ *         description: Goal deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Goal deleted successfully"
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Goal not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.delete('/api/goals/:id', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
@@ -651,7 +1126,35 @@ app.delete('/api/goals/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all user data (for backward compatibility)
+/**
+ * @swagger
+ * /api/user/data:
+ *   get:
+ *     summary: Get all user data
+ *     description: Retrieves all children and goals for the authenticated user (backward compatibility endpoint)
+ *     tags: [User Data]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User data retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserData'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.get('/api/user/data', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
