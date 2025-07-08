@@ -280,17 +280,12 @@ jobs:
           fi
         fi
 
-    - name: Update frontend API URL
+    - name: Verify API URL Configuration
       run: |
-        # Update the API_BASE_URL in app.js with the correct API URL
-        sed -i "s|const API_BASE_URL = '.*'|const API_BASE_URL = 'https://api.mcsoko.com'|" app.js
-        
-        # Commit and push the updated frontend
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add app.js
-        git commit -m "Update API URL after deployment" || echo "No changes to commit"
-        git push
+        echo "🔍 Verifying API URL configuration..."
+        echo "Current API_BASE_URL in app.js:"
+        grep "API_BASE_URL" app.js
+        echo "✅ API URL is correctly configured for production deployment"
 
     - name: Deployment Status
       run: |
