@@ -51,7 +51,8 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    service: 'goalaroo-backend'
+    service: 'goalaroo-backend',
+    version: APP_VERSION
   });
 });
 
@@ -206,6 +207,7 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
+    version: APP_VERSION,
     cors: {
       origin: req.headers.origin,
       frontendUrl: process.env.FRONTEND_URL
@@ -399,27 +401,50 @@ app.post('/api/user/sync', authenticateToken, async (req, res) => {
       serverLastUpdate: serverLastUpdate
     });
 
-    // If no lastSyncTime or local data is newer, use local data
-    if (!lastSyncTime || lastSyncTime > serverLastUpdate) {
-      console.log(`Using local data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
+    // Merge strategy: If client has newer data (no lastSyncTime or client is newer), merge and save
+    if (!lastSyncTime || lastSyncTime >= serverLastUpdate) {
+      console.log(`Client has newer or equal data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
+      
+      // Merge children (prefer client data, but keep server data for any missing children)
+      const mergedChildren = [...(serverData.children || [])];
+      (localChildren || []).forEach(localChild => {
+        const existingIndex = mergedChildren.findIndex(c => c.id === localChild.id);
+        if (existingIndex >= 0) {
+          mergedChildren[existingIndex] = localChild; // Update existing
+        } else {
+          mergedChildren.push(localChild); // Add new
+        }
+      });
+
+      // Merge goals (prefer client data, but keep server data for any missing goals)
+      const mergedGoals = [...(serverData.goals || [])];
+      (localGoals || []).forEach(localGoal => {
+        const existingIndex = mergedGoals.findIndex(g => g.id === localGoal.id);
+        if (existingIndex >= 0) {
+          mergedGoals[existingIndex] = localGoal; // Update existing
+        } else {
+          mergedGoals.push(localGoal); // Add new
+        }
+      });
       
       const newUpdateTime = Date.now();
       await dynamodb.put({
         TableName: TABLES.USER_DATA,
         Item: {
           email: email.toLowerCase(),
-          children: localChildren || [],
-          goals: localGoals || [],
+          children: mergedChildren,
+          goals: mergedGoals,
           updatedAt: newUpdateTime
         }
       }).promise();
 
       const response = {
-        children: localChildren || [],
-        goals: localGoals || [],
-        lastSyncTime: newUpdateTime
+        children: mergedChildren,
+        goals: mergedGoals,
+        lastSyncTime: newUpdateTime,
+        version: APP_VERSION
       };
-      console.log(`Returning local data for ${email}:`, {
+      console.log(`Returning merged data for ${email}:`, {
         childrenCount: response.children.length,
         goalsCount: response.goals.length,
         lastSyncTime: response.lastSyncTime
@@ -427,12 +452,13 @@ app.post('/api/user/sync', authenticateToken, async (req, res) => {
       return res.json(response);
     }
 
-    // Otherwise, return server data
+    // Otherwise, return server data (server is newer)
     console.log(`Using server data for ${email}: local sync time ${lastSyncTime}, server update ${serverLastUpdate}`);
     const response = {
       children: serverData.children || [],
       goals: serverData.goals || [],
-      lastSyncTime: serverLastUpdate
+      lastSyncTime: serverLastUpdate,
+      version: APP_VERSION
     };
     console.log(`Returning server data for ${email}:`, {
       childrenCount: response.children.length,
@@ -457,8 +483,12 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+// Version information
+const APP_VERSION = '1.0.0';
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Goalaroo backend server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Version: ${APP_VERSION}`);
 }); 

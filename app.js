@@ -1,5 +1,8 @@
 // KidGoals PWA - Main Application Logic
 
+// Version information
+const APP_VERSION = '1.0.0';
+
 // Constants
 const COLORS = [
     '#007AFF', '#5856D6', '#AF52DE', '#FF2D92', 
@@ -107,6 +110,7 @@ const elements = {
     
     // Dashboard elements
     userEmail: document.getElementById('user-email'),
+    appVersion: document.getElementById('app-version'),
     logoutBtn: document.getElementById('logout-btn'),
     syncBtn: document.getElementById('sync-btn'),
     addChildBtn: document.getElementById('add-child-btn'),
@@ -155,6 +159,18 @@ const elements = {
 // SVG path for the trail (S-curve)
 const TRAIL_SVG_PATH = "M 30 120 Q 90 30, 170 120 T 310 120";
 const TRAIL_PATH_LENGTH = 280; // Approximate length for 320px width
+
+// Version check function
+async function checkApiVersion() {
+    try {
+        const healthResponse = await apiCall(API_ENDPOINTS.HEALTH);
+        console.log('API version:', healthResponse.version);
+        return healthResponse.version;
+    } catch (error) {
+        console.error('Failed to check API version:', error);
+        return null;
+    }
+}
 
 // API Functions
 async function apiCall(endpoint, options = {}) {
@@ -701,6 +717,12 @@ async function loadUserData() {
         if (isOnline && authToken && currentUser) {
             console.log('Loading data from server...');
             
+            // Check API version for compatibility
+            const apiVersion = await checkApiVersion();
+            if (apiVersion) {
+                console.log(`Client version: ${APP_VERSION}, API version: ${apiVersion}`);
+            }
+            
             // Try to sync with server first
             const localData = loadLocalData();
             const lastSync = loadSyncTime();
@@ -843,6 +865,7 @@ function showDashboard() {
     
     // Update user info
     elements.userEmail.textContent = currentUser.email;
+    elements.appVersion.textContent = `v${APP_VERSION}`;
     
     // Load selected child from storage
     const savedChildId = loadSelectedChild();
