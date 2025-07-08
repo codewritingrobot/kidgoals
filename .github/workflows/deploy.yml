@@ -44,6 +44,38 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
+    - name: Check infrastructure status
+      id: check-infrastructure
+      run: |
+        echo "🔍 Checking infrastructure status..."
+        
+        # Check if cluster exists
+        if aws ecs describe-clusters --clusters ${{ env.ECS_CLUSTER }} --region ${{ env.AWS_REGION }} --query 'clusters[0].status' --output text 2>/dev/null | grep -q "ACTIVE"; then
+          echo "✅ ECS Cluster exists and is active"
+          echo "cluster_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ ECS Cluster does not exist or is not active"
+          echo "cluster_exists=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Check if service exists
+        if aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }} --query 'services[0].status' --output text 2>/dev/null | grep -q "ACTIVE"; then
+          echo "✅ ECS Service exists and is active"
+          echo "service_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ ECS Service does not exist or is not active"
+          echo "service_exists=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Check if task definition exists
+        if aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+          echo "✅ Task definition exists"
+          echo "task_def_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Task definition does not exist"
+          echo "task_def_exists=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Check if task definition exists
       id: check-task-def
       run: |
@@ -52,6 +84,20 @@ jobs:
         else
           echo "exists=false" >> $GITHUB_OUTPUT
         fi
+
+    - name: Validate infrastructure
+      run: |
+        if [ "${{ steps.check-infrastructure.outputs.cluster_exists }}" != "true" ]; then
+          echo "❌ ECS Cluster does not exist. Please run 'terraform apply' first."
+          exit 1
+        fi
+        
+        if [ "${{ steps.check-infrastructure.outputs.service_exists }}" != "true" ]; then
+          echo "❌ ECS Service does not exist. Please run 'terraform apply' first."
+          exit 1
+        fi
+        
+        echo "✅ Infrastructure is ready for deployment"
 
     - name: Download existing task definition
       if: steps.check-task-def.outputs.exists == 'true'
@@ -154,10 +200,15 @@ jobs:
     - name: Deploy to ECS
       run: |
         # Register the task definition
+        echo "Registering task definition..."
         aws ecs register-task-definition --cli-input-json file://task-definition-to-register.json --region ${{ env.AWS_REGION }}
         
         # Check if service exists
-        if aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }} --query 'services[0].status' --output text | grep -q "ACTIVE"; then
+        echo "Checking if ECS service exists..."
+        SERVICE_STATUS=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }} --query 'services[0].status' --output text 2>/dev/null || echo "NOT_FOUND")
+        
+        if [ "$SERVICE_STATUS" = "ACTIVE" ]; then
+          echo "Service is active. Updating service..."
           # Update existing service
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
@@ -166,14 +217,67 @@ jobs:
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
           
-          # Wait for service to be stable
-          aws ecs wait services-stable \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --services ${{ env.ECS_SERVICE }} \
-            --region ${{ env.AWS_REGION }}
+          echo "Waiting for service to be stable (timeout: 10 minutes)..."
+          # Wait for service to be stable with timeout
+          timeout 600 bash -c '
+            while true; do
+              STATUS=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }} --query "services[0].status" --output text)
+              RUNNING=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }} --query "services[0].runningCount" --output text)
+              DESIRED=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }} --query "services[0].desiredCount" --output text)
+              PENDING=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }} --query "services[0].pendingCount" --output text)
+              
+              echo "Service Status: $STATUS, Running: $RUNNING/$DESIRED, Pending: $PENDING"
+              
+              if [ "$STATUS" = "ACTIVE" ] && [ "$RUNNING" = "$DESIRED" ] && [ "$PENDING" = "0" ]; then
+                echo "Service is stable!"
+                break
+              fi
+              
+              sleep 30
+            done
+          '
+          
+          if [ $? -eq 124 ]; then
+            echo "❌ Service did not become stable within 10 minutes"
+            echo "Checking service details..."
+            aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }}
+            exit 1
+          fi
         else
-          echo "Service does not exist yet. Please run Terraform first to create the infrastructure."
+          echo "❌ Service does not exist or is not active. Status: $SERVICE_STATUS"
+          echo "Please run Terraform first to create the infrastructure."
           exit 1
+        fi
+
+    - name: Check ECS Service Status (if deployment failed)
+      if: failure()
+      run: |
+        echo "🔍 Checking ECS service status and logs..."
+        
+        # Get service details
+        echo "Service Details:"
+        aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }}
+        
+        # Get recent tasks
+        echo "Recent Tasks:"
+        TASK_ARNS=$(aws ecs list-tasks --cluster ${{ env.ECS_CLUSTER }} --service-name ${{ env.ECS_SERVICE }} --region ${{ env.AWS_REGION }} --query 'taskArns' --output text)
+        
+        if [ ! -z "$TASK_ARNS" ]; then
+          echo "Task Details:"
+          aws ecs describe-tasks --cluster ${{ env.ECS_CLUSTER }} --tasks $TASK_ARNS --region ${{ env.AWS_REGION }}
+          
+          # Get logs for the most recent task
+          LATEST_TASK=$(echo $TASK_ARNS | tr ' ' '\n' | head -1)
+          if [ ! -z "$LATEST_TASK" ]; then
+            echo "Recent Logs for task $LATEST_TASK:"
+            aws logs get-log-events \
+              --log-group-name "/ecs/goalaroo" \
+              --log-stream-name "ecs/goalaroo-container/$LATEST_TASK" \
+              --region ${{ env.AWS_REGION }} \
+              --start-time $(date -d '10 minutes ago' +%s)000 \
+              --query 'events[*].message' \
+              --output text || echo "Could not retrieve logs"
+          fi
         fi
 
     - name: Update frontend API URL
