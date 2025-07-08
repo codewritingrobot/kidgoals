@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Version System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .version-display {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Version System Test</h1>
+    
+    <div class="test-section">
+        <h2>Current Version Information</h2>
+        <div id="version-info"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Results</h2>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Actions</h2>
+        <button onclick="regenerateVersion()">Regenerate Version</button>
+        <button onclick="openMainApp()">Open Main App</button>
+    </div>
+
+    <script src="version.js"></script>
+    <script>
+        function addTestResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function displayVersionInfo() {
+            const versionInfoDiv = document.getElementById('version-info');
+            
+            if (window.GIT_VERSION) {
+                versionInfoDiv.innerHTML = `
+                    <div class="version-display">
+                        <strong>Version:</strong> ${window.GIT_VERSION.version}<br>
+                        <strong>Commit Hash:</strong> ${window.GIT_VERSION.commitHash}<br>
+                        <strong>Short Hash:</strong> ${window.GIT_VERSION.shortHash}<br>
+                        <strong>Commit Date:</strong> ${window.GIT_VERSION.commitDate}<br>
+                        <strong>Commit Message:</strong> ${window.GIT_VERSION.commitMessage}<br>
+                        <strong>Build Date:</strong> ${window.GIT_VERSION.buildDate}
+                    </div>
+                `;
+            } else {
+                versionInfoDiv.innerHTML = `
+                    <div class="version-display">
+                        <strong>Error:</strong> GIT_VERSION not found
+                    </div>
+                `;
+            }
+        }
+
+        function regenerateVersion() {
+            // This would normally call the Node.js script
+            // For this test, we'll just reload the page
+            location.reload();
+        }
+
+        function openMainApp() {
+            window.open('http://localhost:8000', '_blank');
+        }
+
+        // Run tests when page loads
+        window.addEventListener('load', function() {
+            displayVersionInfo();
+            
+            // Test 1: Check if GIT_VERSION exists
+            if (window.GIT_VERSION) {
+                addTestResult('✅ GIT_VERSION object exists', 'pass');
+            } else {
+                addTestResult('❌ GIT_VERSION object is missing', 'fail');
+            }
+            
+            // Test 2: Check if version property exists
+            if (window.GIT_VERSION && window.GIT_VERSION.version) {
+                addTestResult(`✅ Version: ${window.GIT_VERSION.version}`, 'pass');
+            } else {
+                addTestResult('❌ Version property is missing', 'fail');
+            }
+            
+            // Test 3: Check if commit hash exists
+            if (window.GIT_VERSION && window.GIT_VERSION.commitHash) {
+                addTestResult(`✅ Commit Hash: ${window.GIT_VERSION.commitHash}`, 'pass');
+            } else {
+                addTestResult('❌ Commit Hash is missing', 'fail');
+            }
+            
+            // Test 4: Check version format
+            if (window.GIT_VERSION && window.GIT_VERSION.version) {
+                const version = window.GIT_VERSION.version;
+                if (version.startsWith('v') || version.startsWith('dev-') || version === 'unknown') {
+                    addTestResult('✅ Version format is valid', 'pass');
+                } else {
+                    addTestResult('❌ Version format is invalid', 'fail');
+                }
+            }
+            
+            addTestResult('ℹ️ Version system is ready for deployment', 'info');
+        });
+    </script>
+</body>
+</html> 

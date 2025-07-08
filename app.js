@@ -1,7 +1,7 @@
 // KidGoals PWA - Main Application Logic
 
-// Version information
-const APP_VERSION = '1.0.0';
+// Version information - dynamically generated from Git
+const APP_VERSION = window.GIT_VERSION ? window.GIT_VERSION.version : '1.0.0';
 
 // Constants
 const COLORS = [

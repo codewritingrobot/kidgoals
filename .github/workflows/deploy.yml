@@ -321,6 +321,13 @@ jobs:
         grep "API_BASE_URL" app.js
         echo "✅ API URL is correctly configured for production deployment"
 
+    - name: Generate Version File
+      run: |
+        echo "📝 Generating version file from Git..."
+        node generate-version.js
+        echo "✅ Version file generated:"
+        cat version.js
+
     - name: Deploy Frontend to S3
       run: |
         echo "🚀 Deploying frontend files to S3..."
