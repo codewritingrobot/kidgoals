@@ -425,6 +425,7 @@ function updateOnlineStatus() {
 
 // Data synchronization
 async function loadDataFromServer() {
+    console.log('=== LOAD DATA FROM SERVER CALLED ===');
     if (!isOnline || !currentUser || !authToken) {
         console.log('Cannot load data: offline or not authenticated');
         return;
@@ -438,9 +439,23 @@ async function loadDataFromServer() {
         goals = response.goals || [];
         lastSyncTime = response.lastSyncTime || Date.now();
         
+        // Fix any goals with old format (children array instead of childId)
+        console.log('About to fix goals from server data...');
+        console.log('Goals before fix:', goals.length, goals);
+        console.log('fixGoalFormat function exists:', typeof fixGoalFormat);
+        goals = fixGoalFormat(goals);
+        console.log('Goals after fix:', goals.length, goals);
+        
         // Save to local storage
         saveLocalData();
         saveSyncTime();
+        
+        // Log the fix results
+        if (goals.length > 0) {
+            const oldFormatCount = goals.filter(g => g.children && Array.isArray(g.children)).length;
+            const newFormatCount = goals.filter(g => g.childId && !g.children).length;
+            console.log(`Goal format fix applied: ${oldFormatCount} old format, ${newFormatCount} new format`);
+        }
         
         // Restart timers
         restartTimers();
@@ -452,12 +467,65 @@ async function loadDataFromServer() {
         console.log(`Data loaded: ${children.length} children, ${goals.length} goals`);
     } catch (error) {
         console.error('Failed to load data from server:', error);
-        // Load from local storage as fallback
-        const localData = loadLocalData();
-        children = localData.children || [];
-        goals = localData.goals || [];
-        lastSyncTime = loadSyncTime();
+                    // Load from local storage as fallback
+            const localData = loadLocalData();
+            children = localData.children || [];
+            goals = localData.goals || [];
+            lastSyncTime = loadSyncTime();
+            
+            // Fix any goals with old format
+            console.log('About to fix goals from local data...');
+            goals = fixGoalFormat(goals);
+            
+            // Save the fixed data back to localStorage
+            if (goals.length > 0) {
+                const fixedData = {
+                    children: children,
+                    goals: goals
+                };
+                localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(fixedData));
+            }
     }
+}
+
+// Fix goals with old format (children array instead of childId)
+function fixGoalFormat(goals) {
+    console.log('=== FIX GOAL FORMAT FUNCTION CALLED ===');
+    console.log('fixGoalFormat called with', goals.length, 'goals');
+    
+    const fixedGoals = [];
+    
+    goals.forEach(goal => {
+        if (goal.children && Array.isArray(goal.children) && !goal.childId) {
+            // This is an old format goal - create individual goals for each child
+            console.log('Fixing old format goal:', goal.name, 'with children:', goal.children);
+            
+            const groupId = goal.id || Date.now().toString();
+            goal.children.forEach(childId => {
+                const fixedGoal = {
+                    ...goal,
+                    id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+                    childId: childId,
+                    groupId: groupId,
+                    children: undefined // Remove the children array
+                };
+                fixedGoals.push(fixedGoal);
+                console.log('Created fixed goal:', fixedGoal.name, 'for child:', childId);
+            });
+        } else {
+            // This is already in the correct format
+            console.log('Goal already in correct format:', goal.name, 'childId:', goal.childId);
+            fixedGoals.push(goal);
+        }
+    });
+    
+    if (fixedGoals.length !== goals.length) {
+        console.log(`Fixed ${goals.length} old format goals into ${fixedGoals.length} individual goals`);
+    } else {
+        console.log('No goals needed fixing');
+    }
+    
+    return fixedGoals;
 }
 
 // Enhanced data management functions
@@ -935,6 +1003,19 @@ async function loadUserData() {
             goals = localData.goals || [];
             lastSyncTime = loadSyncTime();
             
+            // Fix any goals with old format
+            console.log('About to fix goals from local data...');
+            goals = fixGoalFormat(goals);
+            
+            // Save the fixed data back to localStorage
+            if (goals.length > 0) {
+                const fixedData = {
+                    children: children,
+                    goals: goals
+                };
+                localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(fixedData));
+            }
+            
             // Save to local storage
             saveLocalData();
             saveSyncTime();
@@ -953,6 +1034,18 @@ async function loadUserData() {
         children = localData.children || [];
         goals = localData.goals || [];
         lastSyncTime = loadSyncTime();
+        
+        // Fix any goals with old format
+        goals = fixGoalFormat(goals);
+        
+        // Save the fixed data back to localStorage
+        if (goals.length > 0) {
+            const fixedData = {
+                children: children,
+                goals: goals
+            };
+            localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(fixedData));
+        }
         
         // Save current state to local storage
         saveLocalData();
@@ -1105,6 +1198,19 @@ function renderGoals() {
         elements.goalsList.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">Select a child to see their goals</p>';
         return;
     }
+    
+    // Debug: Log the structure of each goal
+    console.log('Goal structures:');
+    goals.forEach((goal, index) => {
+        console.log(`Goal ${index}:`, {
+            id: goal.id,
+            name: goal.name,
+            childId: goal.childId,
+            groupId: goal.groupId,
+            children: goal.children,
+            type: goal.type
+        });
+    });
     
     // Get all goals that include the selected child
     let relevantGoals = goals.filter(goal => goal.childId === selectedChildId);
@@ -1933,6 +2039,8 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         console.log('Goal data being sent to server:', goalData);
+        console.log('Selected children IDs:', selectedChildren);
+        console.log('Current children:', children);
         
         // Add timer-specific data if it's a timer goal
         if (goalType === 'timer') {
@@ -2523,6 +2631,23 @@ async function createGoalOnServer(goalData) {
     
     console.log('Server response for goal creation:', response);
     console.log(`Server returned ${response.children?.length || 0} children and ${response.goals?.length || 0} goals`);
+    
+    if (response.goals && response.goals.length > 0) {
+        console.log('Created goals details:', response.goals.map(g => ({
+            id: g.id,
+            name: g.name,
+            childId: g.childId,
+            groupId: g.groupId,
+            children: g.children,
+            type: g.type
+        })));
+        
+        // Check if any goals have the old format
+        const oldFormatGoals = response.goals.filter(g => g.children && Array.isArray(g.children));
+        if (oldFormatGoals.length > 0) {
+            console.log('WARNING: Server returned goals with old format (children array):', oldFormatGoals);
+        }
+    }
     
     // Update local state with server response
     children = response.children || [];
