@@ -46,6 +46,15 @@ app.use(helmet({
   }
 }));
 
+// Simple health check endpoint (bypasses CORS for ELB health checks)
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    service: 'goalaroo-backend'
+  });
+});
+
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
@@ -55,14 +64,9 @@ const corsOptions = {
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
-    // In production, don't allow requests with no origin
-    if (process.env.NODE_ENV === 'production' && !origin) {
-      console.log('CORS blocked null origin in production');
-      return callback(new Error('Not allowed by CORS'));
-    }
-    
-    // Allow requests with no origin only in development
-    if (!origin && process.env.NODE_ENV !== 'production') {
+    // Allow health check requests (no origin) in all environments
+    if (!origin) {
+      console.log('CORS allowing null origin (likely health check)');
       return callback(null, true);
     }
     
