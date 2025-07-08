@@ -1167,22 +1167,25 @@ function openEditChildModal(child) {
     });
     // Save handler
     const form = document.getElementById('edit-child-form');
-    form.onsubmit = function(e) {
+    form.onsubmit = async function(e) {
         e.preventDefault();
         
-        optimisticUpdate(() => {
-            child.name = document.getElementById('edit-child-name').value;
-            child.avatar = avatarPicker.querySelector('.icon-option.selected').textContent;
-            child.color = colorPicker.querySelector('.color-option.selected').style.getPropertyValue('--color');
-            
-            renderChildAvatars();
-            renderGoals();
+        // Update child using server operation
+        const updatedChild = {
+            ...child,
+            name: document.getElementById('edit-child-name').value,
+            avatar: avatarPicker.querySelector('.icon-option.selected').textContent,
+            color: colorPicker.querySelector('.color-option.selected').style.getPropertyValue('--color')
+        };
+        
+        try {
+            await updateChildOnServer(updatedChild);
+            console.log('Child updated successfully:', updatedChild.name);
             hideModal('edit-child-modal');
-        }, {
-            type: 'child_update',
-            childId: child.id,
-            retryCount: 0
-        });
+        } catch (error) {
+            console.error('Failed to update child:', error);
+            alert('Failed to update child. Please try again.');
+        }
     };
     showModal('edit-child-modal');
 }
@@ -1772,7 +1775,7 @@ function playCelebrationSound() {
     }
 }
 
-function completeGoal(goal) {
+async function completeGoal(goal) {
     console.log('Goal completed:', goal.name);
     
     // Stop the timer for this goal
@@ -1842,8 +1845,14 @@ function completeGoal(goal) {
         }
     }
     
-    // Save the updated data
-    saveUserData();
+    // Save the updated data to server
+    try {
+        await updateGoalOnServer(goal);
+        console.log('Goal completion saved to server:', goal.name);
+    } catch (error) {
+        console.error('Failed to save goal completion:', error);
+        // Continue with UI update even if server save fails
+    }
     
     // Update the UI
     renderGoals();
@@ -1907,18 +1916,23 @@ function showStoryPopup(characterName, story) {
     }, 5000);
 }
 
-function restartTimers() {
+async function restartTimers() {
     goals.forEach(goal => {
         if (goal.status === 'active') {
             startGoalTimer(goal);
         } else if (goal.status === 'waiting' && goal.nextStartTime) {
             const timeUntilNext = goal.nextStartTime - Date.now();
             if (timeUntilNext > 0) {
-                const timer = setTimeout(() => {
+                const timer = setTimeout(async () => {
                     goal.status = 'active';
                     goal.startTime = Date.now();
                     goal.nextStartTime = null;
-                    saveUserData();
+                    try {
+                        await updateGoalOnServer(goal);
+                        console.log('Goal restart saved to server:', goal.name);
+                    } catch (error) {
+                        console.error('Failed to save goal restart:', error);
+                    }
                     startGoalTimer(goal);
                     renderGoals();
                 }, timeUntilNext);
@@ -1927,7 +1941,12 @@ function restartTimers() {
                 goal.status = 'active';
                 goal.startTime = Date.now();
                 goal.nextStartTime = null;
-                saveUserData();
+                // Save to server in background
+                updateGoalOnServer(goal).then(() => {
+                    console.log('Goal restart saved to server:', goal.name);
+                }).catch(error => {
+                    console.error('Failed to save goal restart:', error);
+                });
                 startGoalTimer(goal);
             }
         }
@@ -2408,26 +2427,24 @@ function handleEditGoal() {
     }, 100);
 }
 
-function handlePauseGoal() {
+async function handlePauseGoal() {
     const goalId = document.getElementById('goal-detail-modal').getAttribute('data-current-goal-id');
     const goal = goals.find(g => g.id === goalId);
     if (!goal) return;
     
-    optimisticUpdate(() => {
-        if (goal.status === 'active') {
-            goal.status = 'paused';
-            if (elements.pauseGoalBtn) elements.pauseGoalBtn.textContent = '▶️ Resume';
-        } else if (goal.status === 'paused') {
-            goal.status = 'active';
-            if (elements.pauseGoalBtn) elements.pauseGoalBtn.textContent = '⏸️ Pause';
-        }
-        
-        renderGoals();
-    }, {
-        type: 'goal_pause',
-        goalId: goalId,
-        retryCount: 0
-    });
+    // Update goal status using server operation
+    const updatedGoal = {
+        ...goal,
+        status: goal.status === 'active' ? 'paused' : 'active'
+    };
+    
+    try {
+        await updateGoalOnServer(updatedGoal);
+        console.log('Goal status updated successfully:', updatedGoal.name, updatedGoal.status);
+    } catch (error) {
+        console.error('Failed to update goal status:', error);
+        alert('Failed to update goal status. Please try again.');
+    }
 }
 
 function handleResetGoal() {
@@ -2472,7 +2489,7 @@ function handleDeleteGoal() {
     showModal('confirm-modal');
 }
 
-function handleConfirmAction() {
+async function handleConfirmAction() {
     const goalId = document.getElementById('confirm-modal').getAttribute('data-action-goal-id');
     const actionType = document.getElementById('confirm-modal').getAttribute('data-action-type');
     const goal = goals.find(g => g.id === goalId);
@@ -2483,44 +2500,31 @@ function handleConfirmAction() {
     }
     
     if (actionType === 'reset') {
-        // Reset the goal using optimistic update
-        optimisticUpdate(() => {
-            goal.startTime = Date.now();
-            goal.status = 'active';
-            
-            // If it's a group goal, reset all related goals
-            if (goal.groupId) {
-                goals.filter(g => g.groupId === goal.groupId).forEach(g => {
-                    g.startTime = Date.now();
-                    g.status = 'active';
-                });
-            }
-            
-            renderGoals();
-        }, {
-            type: 'goal_reset',
-            goalId: goalId,
-            retryCount: 0
-        });
+        // Reset the goal using server operation
+        const updatedGoal = {
+            ...goal,
+            startTime: Date.now(),
+            status: 'active'
+        };
+        
+        try {
+            await updateGoalOnServer(updatedGoal);
+            console.log('Goal reset successfully:', updatedGoal.name);
+        } catch (error) {
+            console.error('Failed to reset goal:', error);
+            alert('Failed to reset goal. Please try again.');
+        }
         
     } else if (actionType === 'delete') {
-        // Delete the goal using optimistic update
-        optimisticUpdate(() => {
-            if (goal.groupId) {
-                // Delete all goals in the group
-                goals = goals.filter(g => g.groupId !== goal.groupId);
-            } else {
-                // Delete single goal
-                goals = goals.filter(g => g.id !== goalId);
-            }
-            
-            renderGoals();
-        }, {
-            type: 'goal_delete',
-            goalId: goalId,
-            groupId: goal.groupId,
-            retryCount: 0
-        });
+        // Delete the goal using server operation
+        try {
+            await deleteGoalOnServer(goal);
+            console.log('Goal deleted successfully:', goal.name);
+        } catch (error) {
+            console.error('Failed to delete goal:', error);
+            // Show error message to user
+            alert('Failed to delete goal. Please try again.');
+        }
     }
     
     hideModal('confirm-modal');
