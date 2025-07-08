@@ -287,6 +287,42 @@ jobs:
         grep "API_BASE_URL" app.js
         echo "✅ API URL is correctly configured for production deployment"
 
+    - name: Deploy Frontend to S3
+      run: |
+        echo "🚀 Deploying frontend files to S3..."
+        
+        # Get the S3 bucket name from Terraform output (hardcoded for now)
+        S3_BUCKET="goalaroo-frontend-goalaroo"
+        
+        # Sync frontend files to S3
+        aws s3 sync . s3://$S3_BUCKET \
+          --exclude "backend/*" \
+          --exclude "terraform/*" \
+          --exclude ".git/*" \
+          --exclude ".github/*" \
+          --exclude "*.sh" \
+          --exclude "*.md" \
+          --exclude "*.yml" \
+          --exclude "*.yaml" \
+          --exclude "*.tf" \
+          --exclude "*.tfvars" \
+          --exclude "taskdef.json" \
+          --exclude "buildspec.yml" \
+          --exclude "appspec.yml" \
+          --exclude ".gitignore" \
+          --exclude "README.md" \
+          --cache-control "max-age=3600" \
+          --region ${{ env.AWS_REGION }}
+        
+        echo "✅ Frontend files deployed to S3"
+        
+        # Invalidate CloudFront cache
+        echo "🔄 Invalidating CloudFront cache..."
+        aws cloudfront create-invalidation \
+          --distribution-id EPK5KW09K62EN \
+          --paths "/*" \
+          --region ${{ env.AWS_REGION }} || echo "⚠️ Could not invalidate CloudFront cache (distribution ID may need to be updated)"
+
     - name: Deployment Status
       run: |
         echo "✅ Deployment completed successfully!"
