@@ -22,8 +22,8 @@ const API_ENDPOINTS = {
     SEND_CODE: '/api/auth/send-code',
     VERIFY_CODE: '/api/auth/verify-code',
     GET_DATA: '/api/user/data',
-    SAVE_DATA: '/api/user/data',
-    SYNC_DATA: '/api/user/sync',
+    CHILDREN: '/api/user/children',
+    GOALS: '/api/user/goals',
     HEALTH: '/api/health'
 };
 
@@ -84,20 +84,16 @@ let activeTimers = new Map();
 let selectedChildId = null;
 let editingGoalId = null;
 let authToken = null;
-let lastSyncTime = null;
 let isOnline = navigator.onLine;
 let syncInterval = null;
-let isSyncing = false; // Add sync lock to prevent race conditions
 
 // Service Worker Management
 let swRegistration = null;
 let swUpdateInterval = null;
 let swUpdateAvailable = false;
 
-// Enhanced sync system
-let syncQueue = []; // Queue for pending sync operations
-let pendingOperations = new Map(); // Track pending operations by ID
-let operationId = 0; // Counter for operation IDs
+// Simple data management
+let lastSyncTime = null;
 
 // Session Management
 const SESSION_KEY = 'kidgoals_session';
@@ -376,82 +372,50 @@ function updateOnlineStatus() {
     
     if (isOnline && authToken && currentUser) {
         // Trigger immediate sync when coming back online
-        console.log('Coming back online, triggering sync...');
-        syncDataWithServer();
-        // Restart periodic sync
-        startPeriodicSync();
+        console.log('Coming back online, triggering data refresh...');
+        loadDataFromServer();
+        // Restart periodic data refresh
+        startPeriodicDataRefresh();
     } else if (!isOnline) {
-        // Stop periodic sync when going offline
-        stopPeriodicSync();
+        // Stop periodic data refresh when going offline
+        stopPeriodicDataRefresh();
     }
 }
 
 // Data synchronization
-async function syncDataWithServer() {
+async function loadDataFromServer() {
     if (!isOnline || !currentUser || !authToken) {
-        console.log('Cannot sync: offline or not authenticated');
+        console.log('Cannot load data: offline or not authenticated');
         return;
     }
-
-    if (isSyncing) {
-        console.log('Sync already in progress, skipping...');
-        return;
-    }
-
-    isSyncing = true;
     
     try {
-        console.log('Starting data sync with server...');
-        console.log('Local state before sync:', { children: children.length, goals: goals.length });
+        console.log('Loading data from server...');
+        const response = await apiCall(API_ENDPOINTS.GET_DATA);
         
-        // Use current in-memory data, not localStorage data
-        const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
-            method: 'POST',
-            body: JSON.stringify({
-                localChildren: children || [],
-                localGoals: goals || [],
-                lastSyncTime: lastSyncTime
-            })
-        });
-
-        // Check if server data is different from current data
-        const serverChildren = response.children || [];
-        const serverGoals = response.goals || [];
-        const serverSyncTime = response.lastSyncTime;
+        children = response.children || [];
+        goals = response.goals || [];
+        lastSyncTime = response.lastSyncTime || Date.now();
         
-        const childrenChanged = JSON.stringify(children) !== JSON.stringify(serverChildren);
-        const goalsChanged = JSON.stringify(goals) !== JSON.stringify(serverGoals);
+        // Save to local storage
+        saveLocalData();
+        saveSyncTime();
         
-        if (childrenChanged || goalsChanged) {
-            console.log('Server data updated, refreshing local data...');
-            console.log('Server returned:', { children: serverChildren.length, goals: serverGoals.length });
-            
-            // Update local state
-            children = serverChildren;
-            goals = serverGoals;
-            lastSyncTime = serverSyncTime;
-            
-            // Save to local storage
-            saveLocalData();
-            saveSyncTime();
-            
-            // Restart timers
-            restartTimers();
-            
-            // Update UI
-            renderChildAvatars();
-            renderGoals();
-            
-            console.log(`Sync completed: ${children.length} children, ${goals.length} goals`);
-        } else {
-            console.log('Data already in sync with server');
-        }
+        // Restart timers
+        restartTimers();
         
+        // Update UI
+        renderChildAvatars();
+        renderGoals();
+        
+        console.log(`Data loaded: ${children.length} children, ${goals.length} goals`);
     } catch (error) {
-        console.error('Failed to sync data:', error);
-        // Continue with local data - don't throw error to avoid breaking the app
-    } finally {
-        isSyncing = false;
+        console.error('Failed to load data from server:', error);
+        // Load from local storage as fallback
+        const localData = loadLocalData();
+        children = localData.children || [];
+        goals = localData.goals || [];
+        lastSyncTime = loadSyncTime();
     }
 }
 
@@ -477,33 +441,33 @@ function saveSyncTime() {
     }
 }
 
-// Start periodic sync when user is authenticated
-function startPeriodicSync() {
+// Start periodic data refresh when user is authenticated
+function startPeriodicDataRefresh() {
     if (syncInterval) {
         clearInterval(syncInterval);
     }
     
     if (isOnline && authToken && currentUser) {
-        console.log('Starting periodic sync (every 60 seconds)');
+        console.log('Starting periodic data refresh (every 60 seconds)');
         syncInterval = setInterval(() => {
             if (isOnline && authToken && currentUser) {
-                console.log('Periodic sync triggered');
-                syncDataWithServer();
+                console.log('Periodic data refresh triggered');
+                loadDataFromServer();
             } else {
-                console.log('Periodic sync skipped: offline or not authenticated');
+                console.log('Periodic data refresh skipped: offline or not authenticated');
             }
-        }, 60000); // Sync every 60 seconds to reduce conflicts
+        }, 60000); // Refresh every 60 seconds
     } else {
-        console.log('Cannot start periodic sync: offline or not authenticated');
+        console.log('Cannot start periodic data refresh: offline or not authenticated');
     }
 }
 
-// Stop periodic sync
-function stopPeriodicSync() {
+// Stop periodic data refresh
+function stopPeriodicDataRefresh() {
     if (syncInterval) {
         clearInterval(syncInterval);
         syncInterval = null;
-        console.log('Stopped periodic sync');
+        console.log('Stopped periodic data refresh');
     }
 }
 
@@ -852,8 +816,8 @@ async function verifyCode() {
         // Load user data
         await loadUserData();
         
-        // Start periodic sync
-        startPeriodicSync();
+        // Start periodic data refresh
+        startPeriodicDataRefresh();
         
         // Show dashboard
         showDashboard();
@@ -867,8 +831,8 @@ async function verifyCode() {
 }
 
 function logout() {
-    // Stop periodic sync
-    stopPeriodicSync();
+    // Stop periodic data refresh
+    stopPeriodicDataRefresh();
     
     // Clear session
     clearSession();
@@ -888,51 +852,10 @@ function logout() {
 // Data Management Functions
 async function loadUserData() {
     try {
-        // If we have a valid session and are online, sync with server
+        // If we have a valid session and are online, load from server
         if (isOnline && authToken && currentUser) {
             console.log('Loading data from server...');
-            
-            // Check API version for compatibility
-            const apiVersion = await checkApiVersion();
-            if (apiVersion) {
-                console.log(`Client version: ${APP_VERSION}, API version: ${apiVersion}`);
-            }
-            
-            // Try to sync with server first
-            const localData = loadLocalData();
-            const lastSync = loadSyncTime();
-            
-            try {
-                const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        localChildren: localData.children || [],
-                        localGoals: localData.goals || [],
-                        lastSyncTime: lastSync
-                    })
-                });
-
-                // Update with server data
-                children = response.children || [];
-                goals = response.goals || [];
-                lastSyncTime = response.lastSyncTime;
-                
-                console.log('Data synced from server successfully');
-            } catch (syncError) {
-                console.warn('Sync failed, trying direct data fetch:', syncError);
-                
-                // Fallback to direct data fetch
-                try {
-                    const serverData = await apiCall(API_ENDPOINTS.GET_DATA);
-                    children = serverData.children || [];
-                    goals = serverData.goals || [];
-                    lastSyncTime = Date.now();
-                    console.log('Data loaded directly from server');
-                } catch (fetchError) {
-                    console.error('Failed to fetch from server:', fetchError);
-                    throw fetchError;
-                }
-            }
+            await loadDataFromServer();
         } else {
             // Offline or no auth - load from local storage
             console.log('Loading data from local storage (offline/no auth)');
@@ -940,14 +863,14 @@ async function loadUserData() {
             children = localData.children || [];
             goals = localData.goals || [];
             lastSyncTime = loadSyncTime();
+            
+            // Save to local storage
+            saveLocalData();
+            saveSyncTime();
+            
+            // Restore timers
+            restartTimers();
         }
-        
-        // Always save to local storage after loading
-        saveLocalData();
-        saveSyncTime();
-        
-        // Restore timers
-        restartTimers();
         
         console.log(`Loaded ${children.length} children and ${goals.length} goals`);
         
@@ -970,64 +893,7 @@ async function loadUserData() {
     }
 }
 
-async function saveUserData() {
-    console.log('saveUserData called with', goals.length, 'goals');
-    
-    // Always save to local storage first for immediate availability
-    saveLocalData();
-    console.log('Data saved to local storage');
-    
-    // Try to save to server if online and authenticated
-    if (isOnline && authToken && currentUser) {
-        try {
-            console.log('Saving data to server...');
-            console.log('Current lastSyncTime:', lastSyncTime);
-            
-            // Wait for any ongoing sync to complete
-            while (isSyncing) {
-                console.log('Waiting for ongoing sync to complete...');
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            
-            // Use sync endpoint to handle potential conflicts
-            const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
-                method: 'POST',
-                body: JSON.stringify({
-                    localChildren: children,
-                    localGoals: goals,
-                    lastSyncTime: lastSyncTime
-                })
-            });
 
-            console.log('Server response:', response);
-            console.log('Server returned', response.children?.length || 0, 'children and', response.goals?.length || 0, 'goals');
-
-            // Update with server response (in case server had newer data or conflicts were resolved)
-            children = response.children || children;
-            goals = response.goals || goals;
-            lastSyncTime = response.lastSyncTime || Date.now();
-            
-            console.log('After server sync:', goals.length, 'goals');
-            
-            // Update local storage with final state
-            saveLocalData();
-            saveSyncTime();
-            
-            // Update UI to reflect any changes from server
-            renderChildAvatars();
-            renderGoals();
-            
-            console.log('Data saved to server successfully');
-        } catch (error) {
-            console.error('Failed to save to server:', error);
-            // Data is still saved locally, will sync when connection is restored
-        }
-    } else {
-        console.log('Saving data locally only (offline/no auth)');
-        lastSyncTime = Date.now();
-        saveSyncTime();
-    }
-}
 
 // UI Management Functions
 function showAuthScreen() {
@@ -1878,8 +1744,7 @@ function restartTimers() {
     });
 }
 
-function handleAddChildSubmit(e) {
-    // console.log('addChildForm submit');
+async function handleAddChildSubmit(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
     const avatarPicker = document.getElementById('add-child-avatar-picker');
@@ -1891,16 +1756,30 @@ function handleAddChildSubmit(e) {
         createdAt: Date.now()
     };
     
-    optimisticUpdate(() => {
-        children.push(child);
+    try {
+        // Show loading state
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Adding...';
+        submitBtn.disabled = true;
+        
+        // Create child on server
+        await createChildOnServer(child);
+        
         // Select the newly added child
         selectChild(child.id);
         hideModal('add-child-modal');
-    }, {
-        type: 'child_create',
-        childId: child.id,
-        retryCount: 0
-    });
+        
+        console.log('Child created successfully:', child.name);
+    } catch (error) {
+        console.error('Failed to create child:', error);
+        alert('Failed to create child. Please try again.');
+    } finally {
+        // Reset button state
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.textContent = 'Add Child';
+        submitBtn.disabled = false;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1921,8 +1800,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Load user data and show dashboard
         loadUserData().then(() => {
             showDashboard();
-            // Start periodic sync after successful restoration
-            startPeriodicSync();
+            // Start periodic data refresh after successful restoration
+            startPeriodicDataRefresh();
         }).catch((error) => {
             console.error('Failed to load user data after session restoration:', error);
             // Clear invalid session and show auth screen
@@ -1934,7 +1813,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.sendCodeBtn.addEventListener('click', sendMagicCode);
     elements.verifyCodeBtn.addEventListener('click', verifyCode);
     elements.addChildForm.addEventListener('submit', handleAddChildSubmit);
-    elements.addGoalForm.addEventListener('submit', function(e) {
+    elements.addGoalForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         const formData = new FormData(e.target);
         
@@ -2056,7 +1935,27 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } else {
             // --- CREATE NEW GOAL(S) ---
-            createGoal(goalData);
+            try {
+                // Show loading state
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.textContent = 'Creating...';
+                submitBtn.disabled = true;
+                
+                // Create goal on server
+                await createGoalOnServer(goalData);
+                
+                hideModal('add-goal-modal');
+                console.log('Goal created successfully:', goalData.name);
+            } catch (error) {
+                console.error('Failed to create goal:', error);
+                alert('Failed to create goal. Please try again.');
+            } finally {
+                // Reset button state
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                submitBtn.textContent = 'Create Goal';
+                submitBtn.disabled = false;
+            }
         }
     });
 
@@ -2083,13 +1982,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isOnline && authToken && currentUser) {
             elements.syncBtn.textContent = '⏳';
             elements.syncBtn.disabled = true;
-            console.log('Manual sync button clicked');
-            syncDataWithServer().finally(() => {
+            console.log('Manual data refresh button clicked');
+            loadDataFromServer().finally(() => {
                 elements.syncBtn.textContent = '🔄';
                 elements.syncBtn.disabled = false;
             });
         } else {
-            alert('Cannot sync: offline or not authenticated');
+            alert('Cannot refresh data: offline or not authenticated');
         }
     });
     
@@ -2402,150 +2301,24 @@ function handleConfirmAction() {
     hideModal('confirm-modal');
 }
 
-// Enhanced sync system helpers
-function generateOperationId() {
-    return ++operationId;
-}
-
-function queueSyncOperation(operation) {
-    const opId = generateOperationId();
-    operation.id = opId;
-    syncQueue.push(operation);
-    pendingOperations.set(opId, operation);
-    
-    console.log(`Queued sync operation ${opId}:`, operation.type);
-    console.log(`Queue length: ${syncQueue.length}, Is syncing: ${isSyncing}`);
-    
-    // Process queue if not already syncing
-    if (!isSyncing) {
-        console.log('Starting queue processing...');
-        processSyncQueue();
-    } else {
-        console.log('Queue processing already in progress, operation will be processed later');
-    }
-    
-    return opId;
-}
-
-async function processSyncQueue() {
-    if (isSyncing || syncQueue.length === 0) {
-        console.log(`processSyncQueue: ${isSyncing ? 'Already syncing' : 'Queue empty'}`);
-        return;
-    }
-    
-    console.log(`processSyncQueue: Starting to process ${syncQueue.length} operations`);
-    isSyncing = true;
-    
-    try {
-        while (syncQueue.length > 0) {
-            const operation = syncQueue.shift();
-            console.log(`Processing sync operation ${operation.id}:`, operation.type);
-            
-            try {
-                await performSyncOperation(operation);
-                pendingOperations.delete(operation.id);
-                console.log(`Sync operation ${operation.id} completed successfully`);
-            } catch (error) {
-                console.error(`Sync operation ${operation.id} failed:`, error);
-                // Re-queue failed operations for retry (with exponential backoff)
-                if (operation.retryCount < 3) {
-                    operation.retryCount = (operation.retryCount || 0) + 1;
-                    operation.retryDelay = Math.min(1000 * Math.pow(2, operation.retryCount), 10000);
-                    console.log(`Re-queueing operation ${operation.id} for retry ${operation.retryCount} in ${operation.retryDelay}ms`);
-                    setTimeout(() => {
-                        syncQueue.unshift(operation);
-                        if (!isSyncing) {
-                            processSyncQueue();
-                        }
-                    }, operation.retryDelay);
-                } else {
-                    console.error(`Sync operation ${operation.id} failed permanently after ${operation.retryCount} retries`);
-                    pendingOperations.delete(operation.id);
-                }
-            }
-        }
-        console.log('processSyncQueue: All operations processed');
-    } finally {
-        isSyncing = false;
-        console.log('processSyncQueue: Sync lock released');
-    }
-}
-
-async function performSyncOperation(operation) {
+// Simple server operations
+async function createChildOnServer(child) {
     if (!isOnline || !authToken || !currentUser) {
-        throw new Error('Cannot sync: offline or not authenticated');
+        throw new Error('Cannot create child: offline or not authenticated');
     }
     
-    console.log(`performSyncOperation: Starting sync for operation ${operation.id} (${operation.type})`);
-    console.log(`performSyncOperation: Current state - ${children.length} children, ${goals.length} goals`);
-    console.log(`performSyncOperation: Last sync time: ${lastSyncTime ? new Date(lastSyncTime).toLocaleString() : 'Never'}`);
-    
-    // Store current state before sync for comparison
-    const preSyncChildren = [...children];
-    const preSyncGoals = [...goals];
-    
-    const response = await apiCall(API_ENDPOINTS.SYNC_DATA, {
+    const response = await apiCall(API_ENDPOINTS.CHILDREN, {
         method: 'POST',
         body: JSON.stringify({
-            localChildren: children,
-            localGoals: goals,
-            lastSyncTime: lastSyncTime
+            action: 'create',
+            child: child
         })
     });
     
-    console.log(`performSyncOperation: Server response - ${response.children?.length || 0} children, ${response.goals?.length || 0} goals`);
-    
     // Update local state with server response
-    children = response.children || children;
-    goals = response.goals || goals;
+    children = response.children || [];
+    goals = response.goals || [];
     lastSyncTime = response.lastSyncTime || Date.now();
-    
-    console.log(`performSyncOperation: After server update - ${children.length} children, ${goals.length} goals`);
-    
-    // Check if any local items were lost during sync
-    const lostChildren = preSyncChildren.filter(child => 
-        !children.some(c => c.id === child.id)
-    );
-    const lostGoals = preSyncGoals.filter(goal => 
-        !goals.some(g => g.id === goal.id)
-    );
-    
-    // If items were lost, add them back (this handles timing issues)
-    if (lostChildren.length > 0 || lostGoals.length > 0) {
-        console.warn('Items lost during sync, restoring:', {
-            lostChildren: lostChildren.length,
-            lostGoals: lostGoals.length
-        });
-        
-        children = [...children, ...lostChildren];
-        goals = [...goals, ...lostGoals];
-        
-        console.log(`performSyncOperation: After restoration - ${children.length} children, ${goals.length} goals`);
-        
-        // Re-sync with the restored data
-        try {
-            console.log('performSyncOperation: Retrying sync with restored data...');
-            const retryResponse = await apiCall(API_ENDPOINTS.SYNC_DATA, {
-                method: 'POST',
-                body: JSON.stringify({
-                    localChildren: children,
-                    localGoals: goals,
-                    lastSyncTime: lastSyncTime
-                })
-            });
-            
-            children = retryResponse.children || children;
-            goals = retryResponse.goals || goals;
-            lastSyncTime = retryResponse.lastSyncTime || Date.now();
-            
-            console.log(`performSyncOperation: After retry - ${children.length} children, ${goals.length} goals`);
-        } catch (retryError) {
-            console.error('Retry sync failed:', retryError);
-            // Keep the restored data even if retry fails
-        }
-    } else {
-        console.log('performSyncOperation: No items lost during sync');
-    }
     
     // Save to local storage
     saveLocalData();
@@ -2555,32 +2328,150 @@ async function performSyncOperation(operation) {
     renderChildAvatars();
     renderGoals();
     
-    console.log(`performSyncOperation: Sync completed successfully for operation ${operation.id}`);
     return response;
 }
 
-// Optimistic update helper
-function optimisticUpdate(updateFn, syncOperation = null) {
-    console.log('Optimistic update called with operation:', syncOperation?.type || 'default');
-    
-    // Apply the update immediately for responsive UI
-    const result = updateFn();
-    
-    // Save to local storage immediately
-    saveLocalData();
-    
-    // Queue sync operation if provided
-    if (syncOperation) {
-        console.log('Queueing specific sync operation:', syncOperation.type);
-        queueSyncOperation(syncOperation);
-    } else {
-        // Default sync operation
-        console.log('Queueing default sync operation');
-        queueSyncOperation({
-            type: 'data_update',
-            retryCount: 0
-        });
+async function updateChildOnServer(child) {
+    if (!isOnline || !authToken || !currentUser) {
+        throw new Error('Cannot update child: offline or not authenticated');
     }
     
-    return result;
+    const response = await apiCall(API_ENDPOINTS.CHILDREN, {
+        method: 'POST',
+        body: JSON.stringify({
+            action: 'update',
+            child: child
+        })
+    });
+    
+    // Update local state with server response
+    children = response.children || [];
+    goals = response.goals || [];
+    lastSyncTime = response.lastSyncTime || Date.now();
+    
+    // Save to local storage
+    saveLocalData();
+    saveSyncTime();
+    
+    // Update UI
+    renderChildAvatars();
+    renderGoals();
+    
+    return response;
+}
+
+async function deleteChildOnServer(child) {
+    if (!isOnline || !authToken || !currentUser) {
+        throw new Error('Cannot delete child: offline or not authenticated');
+    }
+    
+    const response = await apiCall(API_ENDPOINTS.CHILDREN, {
+        method: 'POST',
+        body: JSON.stringify({
+            action: 'delete',
+            child: child
+        })
+    });
+    
+    // Update local state with server response
+    children = response.children || [];
+    goals = response.goals || [];
+    lastSyncTime = response.lastSyncTime || Date.now();
+    
+    // Save to local storage
+    saveLocalData();
+    saveSyncTime();
+    
+    // Update UI
+    renderChildAvatars();
+    renderGoals();
+    
+    return response;
+}
+
+async function createGoalOnServer(goalData) {
+    if (!isOnline || !authToken || !currentUser) {
+        throw new Error('Cannot create goal: offline or not authenticated');
+    }
+    
+    const response = await apiCall(API_ENDPOINTS.GOALS, {
+        method: 'POST',
+        body: JSON.stringify({
+            action: 'create',
+            goal: goalData
+        })
+    });
+    
+    // Update local state with server response
+    children = response.children || [];
+    goals = response.goals || [];
+    lastSyncTime = response.lastSyncTime || Date.now();
+    
+    // Save to local storage
+    saveLocalData();
+    saveSyncTime();
+    
+    // Update UI
+    renderChildAvatars();
+    renderGoals();
+    
+    return response;
+}
+
+async function updateGoalOnServer(goal) {
+    if (!isOnline || !authToken || !currentUser) {
+        throw new Error('Cannot update goal: offline or not authenticated');
+    }
+    
+    const response = await apiCall(API_ENDPOINTS.GOALS, {
+        method: 'POST',
+        body: JSON.stringify({
+            action: 'update',
+            goal: goal
+        })
+    });
+    
+    // Update local state with server response
+    children = response.children || [];
+    goals = response.goals || [];
+    lastSyncTime = response.lastSyncTime || Date.now();
+    
+    // Save to local storage
+    saveLocalData();
+    saveSyncTime();
+    
+    // Update UI
+    renderChildAvatars();
+    renderGoals();
+    
+    return response;
+}
+
+async function deleteGoalOnServer(goal) {
+    if (!isOnline || !authToken || !currentUser) {
+        throw new Error('Cannot delete goal: offline or not authenticated');
+    }
+    
+    const response = await apiCall(API_ENDPOINTS.GOALS, {
+        method: 'POST',
+        body: JSON.stringify({
+            action: 'delete',
+            goal: goal
+        })
+    });
+    
+    // Update local state with server response
+    children = response.children || [];
+    goals = response.goals || [];
+    lastSyncTime = response.lastSyncTime || Date.now();
+    
+    // Save to local storage
+    saveLocalData();
+    saveSyncTime();
+    
+    // Update UI
+    renderChildAvatars();
+    renderGoals();
+    
+    return response;
 }
