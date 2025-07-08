@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goal Debug Test - KidGoals</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056CC;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        .warning { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Goal Structure Debug Test</h1>
+        
+        <h2>1. Check Local Data</h2>
+        <button onclick="checkLocalData()">Check Local Data</button>
+        <button onclick="fixLocalGoals()">Fix Local Goals</button>
+        
+        <h2>2. Test Goal Format Fix</h2>
+        <button onclick="testGoalConversion()">Test Goal Conversion</button>
+        
+        <h2>3. Check Server Data</h2>
+        <button onclick="checkServerData()">Check Server Data</button>
+        
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://api.mcsoko.com';
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div class="${type}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function checkLocalData() {
+            try {
+                log('Checking local data...', 'info');
+                
+                const localData = JSON.parse(localStorage.getItem('kidgoals_local_data') || '{}');
+                const children = localData.children || [];
+                const goals = localData.goals || [];
+                
+                log(`Found ${children.length} children and ${goals.length} goals in localStorage`, 'info');
+                
+                if (children.length > 0) {
+                    log('Children:', 'info');
+                    children.forEach((child, index) => {
+                        log(`  ${index}: ${child.name} (${child.id})`, 'info');
+                    });
+                }
+                
+                if (goals.length > 0) {
+                    log('Goals structure analysis:', 'info');
+                    goals.forEach((goal, index) => {
+                        const hasChildId = goal.childId !== undefined;
+                        const hasChildren = goal.children && Array.isArray(goal.children);
+                        const hasGroupId = goal.groupId !== undefined;
+                        
+                        log(`Goal ${index}: "${goal.name}"`, 'info');
+                        log(`  - ID: ${goal.id}`, 'info');
+                        log(`  - Type: ${goal.type}`, 'info');
+                        log(`  - Has childId: ${hasChildId} (${goal.childId || 'undefined'})`, hasChildId ? 'success' : 'error');
+                        log(`  - Has children array: ${hasChildren} (${hasChildren ? goal.children : 'undefined'})`, hasChildren ? 'warning' : 'success');
+                        log(`  - Has groupId: ${hasGroupId} (${goal.groupId || 'undefined'})`, hasGroupId ? 'success' : 'info');
+                        log('', 'info');
+                    });
+                    
+                    // Count goals by format
+                    const oldFormatGoals = goals.filter(g => g.children && Array.isArray(g.children));
+                    const newFormatGoals = goals.filter(g => g.childId && !g.children);
+                    const mixedFormatGoals = goals.filter(g => g.childId && g.children);
+                    
+                    log(`Format analysis:`, 'info');
+                    log(`  - Old format (children array): ${oldFormatGoals.length}`, oldFormatGoals.length > 0 ? 'warning' : 'success');
+                    log(`  - New format (childId only): ${newFormatGoals.length}`, 'success');
+                    log(`  - Mixed format (both): ${mixedFormatGoals.length}`, mixedFormatGoals.length > 0 ? 'warning' : 'success');
+                }
+            } catch (error) {
+                log(`Error checking local data: ${error.message}`, 'error');
+            }
+        }
+        
+        function fixLocalGoals() {
+            try {
+                log('Fixing local goals...', 'info');
+                
+                const localData = JSON.parse(localStorage.getItem('kidgoals_local_data') || '{}');
+                const children = localData.children || [];
+                const goals = localData.goals || [];
+                
+                if (goals.length === 0) {
+                    log('No goals to fix', 'info');
+                    return;
+                }
+                
+                const fixedGoals = fixGoalFormat(goals);
+                
+                if (fixedGoals.length !== goals.length) {
+                    log(`Fixed ${goals.length} old format goals into ${fixedGoals.length} individual goals`, 'success');
+                    
+                    // Save the fixed data back to localStorage
+                    const fixedData = {
+                        ...localData,
+                        goals: fixedGoals
+                    };
+                    localStorage.setItem('kidgoals_local_data', JSON.stringify(fixedData));
+                    log('Saved fixed data to localStorage', 'success');
+                    
+                    // Show the fixed goals
+                    log('Fixed goals structure:', 'info');
+                    fixedGoals.forEach((goal, index) => {
+                        log(`Goal ${index}: "${goal.name}" - childId: ${goal.childId}, groupId: ${goal.groupId}`, 'success');
+                    });
+                    
+                    // Also update the main app's global variables if possible
+                    if (window.goals && window.children) {
+                        window.goals = fixedGoals;
+                        window.children = children;
+                        log('Updated main app global variables', 'success');
+                    }
+                } else {
+                    log('All goals are already in the correct format', 'success');
+                }
+            } catch (error) {
+                log(`Error fixing local goals: ${error.message}`, 'error');
+            }
+        }
+        
+        function fixGoalFormat(goals) {
+            const fixedGoals = [];
+            
+            goals.forEach(goal => {
+                if (goal.children && Array.isArray(goal.children) && !goal.childId) {
+                    // This is an old format goal - create individual goals for each child
+                    log(`Fixing old format goal: ${goal.name}`, 'info');
+                    
+                    const groupId = goal.id || Date.now().toString();
+                    goal.children.forEach(childId => {
+                        const fixedGoal = {
+                            ...goal,
+                            id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+                            childId: childId,
+                            groupId: groupId,
+                            children: undefined // Remove the children array
+                        };
+                        fixedGoals.push(fixedGoal);
+                    });
+                } else {
+                    // This is already in the correct format
+                    fixedGoals.push(goal);
+                }
+            });
+            
+            return fixedGoals;
+        }
+        
+        function testGoalConversion() {
+            log('Testing goal format conversion...', 'info');
+            
+            // Test data with old format
+            const oldGoals = [
+                {
+                    id: 'test1',
+                    name: 'No Hitting',
+                    type: 'daily',
+                    color: '#AF52DE',
+                    children: ['child1', 'child2'],
+                    repeat: true
+                },
+                {
+                    id: 'test2',
+                    name: 'Brush Teeth',
+                    type: 'daily',
+                    color: '#5856D6',
+                    children: ['child1'],
+                    repeat: true
+                }
+            ];
+            
+            log('Original goals:', 'info');
+            oldGoals.forEach((goal, index) => {
+                log(`  ${index}: "${goal.name}" - children: ${goal.children}`, 'info');
+            });
+            
+            // Apply the fix function
+            const fixedGoals = fixGoalFormat(oldGoals);
+            
+            log('Fixed goals:', 'success');
+            fixedGoals.forEach((goal, index) => {
+                log(`  ${index}: "${goal.name}" - childId: ${goal.childId}, groupId: ${goal.groupId}`, 'success');
+            });
+            
+            log(`Converted ${oldGoals.length} old format goals into ${fixedGoals.length} individual goals`, 'success');
+        }
+        
+        async function checkServerData() {
+            try {
+                log('Checking server data...', 'info');
+                
+                const authToken = localStorage.getItem('authToken');
+                if (!authToken) {
+                    log('No auth token found', 'error');
+                    return;
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/api/user/data`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const children = data.children || [];
+                    const goals = data.goals || [];
+                    
+                    log(`Server returned ${children.length} children and ${goals.length} goals`, 'success');
+                    
+                    if (goals.length > 0) {
+                        log('Server goals structure analysis:', 'info');
+                        goals.forEach((goal, index) => {
+                            const hasChildId = goal.childId !== undefined;
+                            const hasChildren = goal.children && Array.isArray(goal.children);
+                            const hasGroupId = goal.groupId !== undefined;
+                            
+                            log(`Goal ${index}: "${goal.name}"`, 'info');
+                            log(`  - ID: ${goal.id}`, 'info');
+                            log(`  - Type: ${goal.type}`, 'info');
+                            log(`  - Has childId: ${hasChildId} (${goal.childId || 'undefined'})`, hasChildId ? 'success' : 'error');
+                            log(`  - Has children array: ${hasChildren} (${hasChildren ? goal.children : 'undefined'})`, hasChildren ? 'warning' : 'success');
+                            log(`  - Has groupId: ${hasGroupId} (${goal.groupId || 'undefined'})`, hasGroupId ? 'success' : 'info');
+                            log('', 'info');
+                        });
+                        
+                        // Count goals by format
+                        const oldFormatGoals = goals.filter(g => g.children && Array.isArray(g.children));
+                        const newFormatGoals = goals.filter(g => g.childId && !g.children);
+                        
+                        log(`Server format analysis:`, 'info');
+                        log(`  - Old format (children array): ${oldFormatGoals.length}`, oldFormatGoals.length > 0 ? 'warning' : 'success');
+                        log(`  - New format (childId only): ${newFormatGoals.length}`, 'success');
+                    }
+                } else {
+                    log(`Server request failed: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log(`Error checking server data: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-run local data check on page load
+        window.addEventListener('load', () => {
+            log('Page loaded. Ready to debug goal structure.', 'info');
+        });
+    </script>
+</body>
+</html> 

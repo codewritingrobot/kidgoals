@@ -1,6 +1,6 @@
 // KidGoals Service Worker
 // Cache version will be dynamically set from version.js
-let CACHE_VERSION = 'kidgoals-v2'; // Fallback version
+let CACHE_VERSION = 'kidgoals-v3'; // Fallback version
 let CACHE_NAME = `${CACHE_VERSION}-${Date.now()}`; // Unique cache name for each update
 
 // Try to get cache version from the main app

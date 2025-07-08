@@ -52,7 +52,7 @@ app.get('/health', (req, res) => {
     status: 'healthy', 
     timestamp: new Date().toISOString(),
     service: 'goalaroo-backend',
-    version: APP_VERSION
+    version: '2.0.0'
   });
 });
 
@@ -199,70 +199,35 @@ async function sendMagicCodeEmail(email, code) {
   }
 }
 
-// Routes
-
-// Health check
-app.get('/api/health', (req, res) => {
-  console.log('Health check request from:', req.headers.origin);
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    version: APP_VERSION,
-    cors: {
-      origin: req.headers.origin,
-      frontendUrl: process.env.FRONTEND_URL
-    }
-  });
-});
-
-// CORS debug endpoint
-app.get('/api/cors-debug', (req, res) => {
-  console.log('CORS debug request from:', req.headers.origin);
-  res.json({
-    message: 'CORS is working',
-    requestOrigin: req.headers.origin,
-    allowedOrigins: [
-      'https://goalaroo.mcsoko.com',
-      'https://www.goalaroo.mcsoko.com',
-      process.env.FRONTEND_URL
-    ].filter(Boolean),
-    environment: {
-      FRONTEND_URL: process.env.FRONTEND_URL,
-      NODE_ENV: process.env.NODE_ENV
-    }
-  });
-});
-
-// Send magic code
+// Authentication endpoints
 app.post('/api/auth/send-code', async (req, res) => {
   try {
     const { email } = req.body;
     
     if (!email || !validator.isEmail(email)) {
-      return res.status(400).json({ error: 'Valid email required' });
+      return res.status(400).json({ error: 'Valid email is required' });
     }
-
+    
     const code = generateMagicCode();
     const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes
-
-    // Store magic code in DynamoDB
+    
+    // Store magic code
     await dynamodb.put({
       TableName: TABLES.MAGIC_CODES,
       Item: {
         email: email.toLowerCase(),
-        code: code,
-        expiresAt: expiresAt,
+        code,
+        expiresAt,
         createdAt: Date.now()
       }
     }).promise();
-
+    
     // Send email
     const emailSent = await sendMagicCodeEmail(email, code);
-    
     if (!emailSent) {
       return res.status(500).json({ error: 'Failed to send email' });
     }
-
+    
     res.json({ message: 'Magic code sent successfully' });
   } catch (error) {
     console.error('Error sending magic code:', error);
@@ -270,56 +235,76 @@ app.post('/api/auth/send-code', async (req, res) => {
   }
 });
 
-// Verify magic code
 app.post('/api/auth/verify-code', async (req, res) => {
   try {
     const { email, code } = req.body;
     
-    if (!email || !validator.isEmail(email) || !code) {
-      return res.status(400).json({ error: 'Valid email and code required' });
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and code are required' });
     }
-
-    // Get magic code from DynamoDB
+    
+    // Get stored code
     const result = await dynamodb.get({
       TableName: TABLES.MAGIC_CODES,
       Key: { email: email.toLowerCase() }
     }).promise();
-
-    if (!result.Item || result.Item.code !== code) {
-      return res.status(400).json({ error: 'Invalid code' });
+    
+    if (!result.Item || result.Item.code !== code || result.Item.expiresAt < Date.now()) {
+      return res.status(400).json({ error: 'Invalid or expired code' });
     }
-
-    if (Date.now() > result.Item.expiresAt) {
-      return res.status(400).json({ error: 'Code expired' });
-    }
-
+    
     // Delete used code
     await dynamodb.delete({
       TableName: TABLES.MAGIC_CODES,
       Key: { email: email.toLowerCase() }
     }).promise();
-
-    // Create or update user
-    const userId = uuidv4();
-    await dynamodb.put({
-      TableName: TABLES.USERS,
-      Item: {
-        email: email.toLowerCase(),
-        userId: userId,
-        lastLogin: Date.now(),
-        createdAt: Date.now()
-      }
-    }).promise();
-
+    
     // Generate JWT token
-    const token = generateJWT(email.toLowerCase());
-
+    const token = generateJWT(email);
+    
+    // Create or get user
+    const userResult = await dynamodb.get({
+      TableName: TABLES.USERS,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    if (!userResult.Item) {
+      // Create new user
+      await dynamodb.put({
+        TableName: TABLES.USERS,
+        Item: {
+          email: email.toLowerCase(),
+          createdAt: Date.now(),
+          lastLogin: Date.now()
+        }
+      }).promise();
+      
+      // Initialize user data
+      await dynamodb.put({
+        TableName: TABLES.USER_DATA,
+        Item: {
+          email: email.toLowerCase(),
+          children: [],
+          goals: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      }).promise();
+    } else {
+      // Update last login
+      await dynamodb.update({
+        TableName: TABLES.USERS,
+        Key: { email: email.toLowerCase() },
+        UpdateExpression: 'SET lastLogin = :lastLogin',
+        ExpressionAttributeValues: {
+          ':lastLogin': Date.now()
+        }
+      }).promise();
+    }
+    
     res.json({
       token,
-      user: {
-        email: email.toLowerCase(),
-        userId: userId
-      }
+      user: { email: email.toLowerCase() }
     });
   } catch (error) {
     console.error('Error verifying code:', error);
@@ -327,190 +312,360 @@ app.post('/api/auth/verify-code', async (req, res) => {
   }
 });
 
-// Get user data
-app.get('/api/user/data', authenticateToken, async (req, res) => {
+// Clean CRUD API for Children
+app.get('/api/children', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
-
+    
     const result = await dynamodb.get({
       TableName: TABLES.USER_DATA,
       Key: { email: email.toLowerCase() }
     }).promise();
-
-    if (!result.Item) {
-      return res.json({ children: [], goals: [] });
-    }
-
-    res.json({
-      children: result.Item.children || [],
-      goals: result.Item.goals || []
-    });
+    
+    const children = result.Item?.children || [];
+    res.json(children);
   } catch (error) {
-    console.error('Error getting user data:', error);
+    console.error('Error getting children:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Save user data
-app.post('/api/user/data', authenticateToken, async (req, res) => {
+app.post('/api/children', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
-    const { children, goals } = req.body;
-
+    const childData = req.body;
+    
+    // Validate required fields
+    if (!childData.name || !childData.avatar || !childData.color) {
+      return res.status(400).json({ error: 'Name, avatar, and color are required' });
+    }
+    
+    // Generate unique ID
+    const child = {
+      id: uuidv4(),
+      name: childData.name,
+      avatar: childData.avatar,
+      color: childData.color,
+      createdAt: Date.now()
+    };
+    
+    // Get current data
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const userData = result.Item || { children: [], goals: [] };
+    userData.children.push(child);
+    userData.updatedAt = Date.now();
+    
+    // Save to database
     await dynamodb.put({
       TableName: TABLES.USER_DATA,
       Item: {
         email: email.toLowerCase(),
-        children: children || [],
-        goals: goals || [],
-        updatedAt: Date.now()
+        children: userData.children,
+        goals: userData.goals,
+        updatedAt: userData.updatedAt
       }
     }).promise();
-
-    res.json({ message: 'Data saved successfully' });
+    
+    res.status(201).json(child);
   } catch (error) {
-    console.error('Error saving user data:', error);
+    console.error('Error creating child:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Simple data operations - server is always the source of truth
-app.post('/api/user/children', authenticateToken, async (req, res) => {
+app.put('/api/children/:id', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
-    const { action, child } = req.body;
+    const { id } = req.params;
+    const updates = req.body;
     
-    console.log(`${action} child request from ${email}:`, child?.name || 'N/A');
-    
-    // Get current server data
+    // Get current data
     const result = await dynamodb.get({
       TableName: TABLES.USER_DATA,
       Key: { email: email.toLowerCase() }
     }).promise();
     
-    const serverData = result.Item || { children: [], goals: [] };
-    let updated = false;
+    const userData = result.Item || { children: [], goals: [] };
+    const childIndex = userData.children.findIndex(c => c.id === id);
     
-    if (action === 'create') {
-      // Add new child
-      serverData.children.push(child);
-      updated = true;
-    } else if (action === 'update') {
-      // Update existing child
-      const index = serverData.children.findIndex(c => c.id === child.id);
-      if (index !== -1) {
-        serverData.children[index] = child;
-        updated = true;
+    if (childIndex === -1) {
+      return res.status(404).json({ error: 'Child not found' });
+    }
+    
+    // Update child
+    userData.children[childIndex] = {
+      ...userData.children[childIndex],
+      ...updates,
+      updatedAt: Date.now()
+    };
+    
+    userData.updatedAt = Date.now();
+    
+    // Save to database
+    await dynamodb.put({
+      TableName: TABLES.USER_DATA,
+      Item: {
+        email: email.toLowerCase(),
+        children: userData.children,
+        goals: userData.goals,
+        updatedAt: userData.updatedAt
       }
-    } else if (action === 'delete') {
-      // Delete child and all associated goals
-      serverData.children = serverData.children.filter(c => c.id !== child.id);
-      serverData.goals = serverData.goals.filter(g => g.childId !== child.id);
-      updated = true;
-    }
+    }).promise();
     
-    if (updated) {
-      serverData.updatedAt = Date.now();
-      await dynamodb.put({
-        TableName: TABLES.USER_DATA,
-        Item: {
-          email: email.toLowerCase(),
-          children: serverData.children,
-          goals: serverData.goals,
-          updatedAt: serverData.updatedAt
-        }
-      }).promise();
-    }
-    
-    res.json({
-      children: serverData.children,
-      goals: serverData.goals,
-      lastSyncTime: serverData.updatedAt
-    });
+    res.json(userData.children[childIndex]);
   } catch (error) {
-    console.error('Error with child operation:', error);
+    console.error('Error updating child:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.post('/api/user/goals', authenticateToken, async (req, res) => {
+app.delete('/api/children/:id', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
-    const { action, goal } = req.body;
+    const { id } = req.params;
     
-    console.log(`${action} goal request from ${email}:`, goal?.name || 'N/A');
-    
-    // Get current server data
+    // Get current data
     const result = await dynamodb.get({
       TableName: TABLES.USER_DATA,
       Key: { email: email.toLowerCase() }
     }).promise();
     
-    const serverData = result.Item || { children: [], goals: [] };
-    let updated = false;
+    const userData = result.Item || { children: [], goals: [] };
     
-    if (action === 'create') {
-      // Add new goal(s) - goal can be an array for group goals
-      const goalsToAdd = Array.isArray(goal) ? goal : [goal];
-      serverData.goals.push(...goalsToAdd);
-      updated = true;
-    } else if (action === 'update') {
-      // Update existing goal
-      const index = serverData.goals.findIndex(g => g.id === goal.id);
-      if (index !== -1) {
-        serverData.goals[index] = goal;
-        updated = true;
+    // Remove child
+    userData.children = userData.children.filter(c => c.id !== id);
+    
+    // Remove associated goals
+    userData.goals = userData.goals.filter(g => g.childId !== id);
+    
+    userData.updatedAt = Date.now();
+    
+    // Save to database
+    await dynamodb.put({
+      TableName: TABLES.USER_DATA,
+      Item: {
+        email: email.toLowerCase(),
+        children: userData.children,
+        goals: userData.goals,
+        updatedAt: userData.updatedAt
       }
-    } else if (action === 'delete') {
-      // Delete goal(s) - can be single goal or group
-      if (goal.groupId) {
-        serverData.goals = serverData.goals.filter(g => g.groupId !== goal.groupId);
-      } else {
-        serverData.goals = serverData.goals.filter(g => g.id !== goal.id);
-      }
-      updated = true;
-    }
+    }).promise();
     
-    if (updated) {
-      serverData.updatedAt = Date.now();
-      await dynamodb.put({
-        TableName: TABLES.USER_DATA,
-        Item: {
-          email: email.toLowerCase(),
-          children: serverData.children,
-          goals: serverData.goals,
-          updatedAt: serverData.updatedAt
-        }
-      }).promise();
-    }
-    
-    res.json({
-      children: serverData.children,
-      goals: serverData.goals,
-      lastSyncTime: serverData.updatedAt
-    });
+    res.json({ message: 'Child deleted successfully' });
   } catch (error) {
-    console.error('Error with goal operation:', error);
+    console.error('Error deleting child:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Simple data fetch - always returns current server state
+// Clean CRUD API for Goals
+app.get('/api/goals', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const goals = result.Item?.goals || [];
+    res.json(goals);
+  } catch (error) {
+    console.error('Error getting goals:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/goals', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const goalData = req.body;
+    
+    // Validate required fields
+    if (!goalData.name || !goalData.type || !goalData.childIds || !Array.isArray(goalData.childIds)) {
+      return res.status(400).json({ error: 'Name, type, and childIds array are required' });
+    }
+    
+    // Get current data
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const userData = result.Item || { children: [], goals: [] };
+    const createdGoals = [];
+    
+    // Create individual goals for each child
+    const groupId = uuidv4();
+    goalData.childIds.forEach(childId => {
+      const goal = {
+        id: uuidv4(),
+        groupId: groupId,
+        childId: childId,
+        name: goalData.name,
+        type: goalData.type,
+        color: goalData.color || '#007AFF',
+        status: 'active',
+        startTime: Date.now(),
+        createdAt: Date.now(),
+        themeType: goalData.type,
+        repeat: goalData.repeat || false,
+        repeatSchedule: goalData.repeatSchedule || null,
+        progress: 0,
+        completedAt: null
+      };
+      
+      // Add timer-specific properties
+      if (goalData.type === 'timer') {
+        goal.duration = goalData.duration;
+        goal.unit = goalData.unit;
+        goal.timerType = goalData.timerType;
+        goal.totalDuration = goalData.totalDuration;
+        goal.themeType = goalData.timerType;
+      }
+      
+      // Add count-specific properties
+      if (goalData.type === 'countdown' || goalData.type === 'countup') {
+        goal.target = goalData.target;
+        goal.current = goalData.current || 0;
+      }
+      
+      userData.goals.push(goal);
+      createdGoals.push(goal);
+    });
+    
+    userData.updatedAt = Date.now();
+    
+    // Save to database
+    await dynamodb.put({
+      TableName: TABLES.USER_DATA,
+      Item: {
+        email: email.toLowerCase(),
+        children: userData.children,
+        goals: userData.goals,
+        updatedAt: userData.updatedAt
+      }
+    }).promise();
+    
+    res.status(201).json(createdGoals);
+  } catch (error) {
+    console.error('Error creating goals:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/goals/:id', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const { id } = req.params;
+    const updates = req.body;
+    
+    // Get current data
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const userData = result.Item || { children: [], goals: [] };
+    const goalIndex = userData.goals.findIndex(g => g.id === id);
+    
+    if (goalIndex === -1) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    // Update goal
+    userData.goals[goalIndex] = {
+      ...userData.goals[goalIndex],
+      ...updates,
+      updatedAt: Date.now()
+    };
+    
+    userData.updatedAt = Date.now();
+    
+    // Save to database
+    await dynamodb.put({
+      TableName: TABLES.USER_DATA,
+      Item: {
+        email: email.toLowerCase(),
+        children: userData.children,
+        goals: userData.goals,
+        updatedAt: userData.updatedAt
+      }
+    }).promise();
+    
+    res.json(userData.goals[goalIndex]);
+  } catch (error) {
+    console.error('Error updating goal:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/api/goals/:id', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const { id } = req.params;
+    
+    // Get current data
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const userData = result.Item || { children: [], goals: [] };
+    
+    // Find the goal to get its groupId
+    const goalToDelete = userData.goals.find(g => g.id === id);
+    
+    if (!goalToDelete) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    // Remove goal(s) - if it has a groupId, remove all goals in the group
+    if (goalToDelete.groupId) {
+      userData.goals = userData.goals.filter(g => g.groupId !== goalToDelete.groupId);
+    } else {
+      userData.goals = userData.goals.filter(g => g.id !== id);
+    }
+    
+    userData.updatedAt = Date.now();
+    
+    // Save to database
+    await dynamodb.put({
+      TableName: TABLES.USER_DATA,
+      Item: {
+        email: email.toLowerCase(),
+        children: userData.children,
+        goals: userData.goals,
+        updatedAt: userData.updatedAt
+      }
+    }).promise();
+    
+    res.json({ message: 'Goal deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting goal:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all user data (for backward compatibility)
 app.get('/api/user/data', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
-
+    
     const result = await dynamodb.get({
       TableName: TABLES.USER_DATA,
       Key: { email: email.toLowerCase() }
     }).promise();
-
-    const serverData = result.Item || { children: [], goals: [] };
+    
+    const userData = result.Item || { children: [], goals: [] };
     
     res.json({
-      children: serverData.children || [],
-      goals: serverData.goals || [],
-      lastSyncTime: serverData.updatedAt || Date.now()
+      children: userData.children || [],
+      goals: userData.goals || []
     });
   } catch (error) {
     console.error('Error getting user data:', error);
@@ -529,12 +684,9 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Version information
-const APP_VERSION = '1.0.0';
-
 // Start server
 app.listen(PORT, () => {
   console.log(`Goalaroo backend server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Version: ${APP_VERSION}`);
+  console.log(`Version: 2.0.0 - Clean CRUD API`);
 });
