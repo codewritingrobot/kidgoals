@@ -2,6 +2,7 @@
 
 // Version information - dynamically generated from Git
 const APP_VERSION = window.GIT_VERSION ? window.GIT_VERSION.version : '1.0.0';
+let lastKnownVersion = null;
 
 // Constants
 const COLORS = [
@@ -92,6 +93,9 @@ let swRegistration = null;
 let swUpdateInterval = null;
 let swUpdateAvailable = false;
 
+// Version checking
+let versionCheckInterval = null;
+
 // Simple data management
 let lastSyncTime = null;
 
@@ -170,6 +174,37 @@ function checkForServiceWorkerUpdate() {
             .catch(error => {
                 console.error('Service Worker update check failed:', error);
             });
+    }
+}
+
+// Check for version updates
+function checkForVersionUpdate() {
+    // Get current version from the footer
+    const currentVersionElement = document.querySelector('.app-version');
+    if (!currentVersionElement) return;
+    
+    const currentVersion = currentVersionElement.textContent.replace('v', '');
+    
+    // If this is the first check, just store the version
+    if (lastKnownVersion === null) {
+        lastKnownVersion = currentVersion;
+        console.log(`Initial version check: ${currentVersion}`);
+        return;
+    }
+    
+    // Check if version has changed
+    if (currentVersion !== lastKnownVersion) {
+        console.log(`Version changed from ${lastKnownVersion} to ${currentVersion}`);
+        console.log('Triggering service worker update check...');
+        
+        // Update the stored version
+        lastKnownVersion = currentVersion;
+        
+        // Trigger service worker update
+        checkForServiceWorkerUpdate();
+        
+        // Show update notification
+        showUpdateNotification();
     }
 }
 
@@ -376,9 +411,15 @@ function updateOnlineStatus() {
         loadDataFromServer();
         // Restart periodic data refresh
         startPeriodicDataRefresh();
+        
+        // Restart version checking
+        startVersionChecking();
     } else if (!isOnline) {
         // Stop periodic data refresh when going offline
         stopPeriodicDataRefresh();
+        
+        // Stop version checking when going offline
+        stopVersionChecking();
     }
 }
 
@@ -462,12 +503,36 @@ function startPeriodicDataRefresh() {
     }
 }
 
+// Start version checking
+function startVersionChecking() {
+    if (versionCheckInterval) {
+        clearInterval(versionCheckInterval);
+    }
+    
+    console.log('Starting version checking (every 30 seconds)');
+    versionCheckInterval = setInterval(() => {
+        checkForVersionUpdate();
+    }, 30000); // Check every 30 seconds
+    
+    // Also check immediately
+    checkForVersionUpdate();
+}
+
 // Stop periodic data refresh
 function stopPeriodicDataRefresh() {
     if (syncInterval) {
         clearInterval(syncInterval);
         syncInterval = null;
         console.log('Stopped periodic data refresh');
+    }
+}
+
+// Stop version checking
+function stopVersionChecking() {
+    if (versionCheckInterval) {
+        clearInterval(versionCheckInterval);
+        versionCheckInterval = null;
+        console.log('Stopped version checking');
     }
 }
 
@@ -819,6 +884,9 @@ async function verifyCode() {
         // Start periodic data refresh
         startPeriodicDataRefresh();
         
+        // Start version checking
+        startVersionChecking();
+        
         // Show dashboard
         showDashboard();
         
@@ -833,6 +901,9 @@ async function verifyCode() {
 function logout() {
     // Stop periodic data refresh
     stopPeriodicDataRefresh();
+    
+    // Stop version checking
+    stopVersionChecking();
     
     // Clear session
     clearSession();
@@ -1802,6 +1873,9 @@ document.addEventListener('DOMContentLoaded', () => {
             showDashboard();
             // Start periodic data refresh after successful restoration
             startPeriodicDataRefresh();
+            
+            // Start version checking
+            startVersionChecking();
         }).catch((error) => {
             console.error('Failed to load user data after session restoration:', error);
             // Clear invalid session and show auth screen
@@ -1999,6 +2073,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (syncInterval) {
             clearInterval(syncInterval);
+        }
+        if (versionCheckInterval) {
+            clearInterval(versionCheckInterval);
         }
     });
 });

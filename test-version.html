@@ -3,159 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Version System Test</title>
+    <title>Version Check Test</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+            background: #f5f5f5;
         }
         .test-section {
+            background: white;
+            padding: 20px;
             margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
             border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .test-result {
+        .test-button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056CC;
+        }
+        .test-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
             margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status {
             padding: 10px;
             border-radius: 4px;
+            margin: 10px 0;
         }
-        .pass {
-            background-color: #d4edda;
+        .status.success {
+            background: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
-        .fail {
-            background-color: #f8d7da;
+        .status.error {
+            background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
-        .info {
-            background-color: #d1ecf1;
+        .status.info {
+            background: #d1ecf1;
             color: #0c5460;
             border: 1px solid #bee5eb;
         }
         .version-display {
-            font-family: monospace;
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 4px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #007AFF;
             margin: 10px 0;
-        }
-        button {
-            padding: 10px 20px;
-            margin: 5px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-        }
-        button:hover {
-            background-color: #0056b3;
         }
     </style>
 </head>
 <body>
-    <h1>Version System Test</h1>
-    
+    <h1>Version Check Test</h1>
+    <p>This page tests the version checking functionality that triggers when the version number changes.</p>
+
     <div class="test-section">
-        <h2>Current Version Information</h2>
-        <div id="version-info"></div>
+        <h2>Current Version</h2>
+        <div class="version-display" id="current-version">v1.0.0</div>
+        <p>This simulates the version display in the footer of the main app.</p>
     </div>
-    
+
+    <div class="test-section">
+        <h2>Version Check Simulation</h2>
+        <p>Click the buttons below to simulate version changes and test the version checking logic:</p>
+        <button class="test-button" onclick="simulateVersionChange('1.0.1')">Simulate v1.0.1</button>
+        <button class="test-button" onclick="simulateVersionChange('1.1.0')">Simulate v1.1.0</button>
+        <button class="test-button" onclick="simulateVersionChange('2.0.0')">Simulate v2.0.0</button>
+        <button class="test-button" onclick="resetVersion()">Reset to v1.0.0</button>
+        <button class="test-button" onclick="testVersionCheck()">Test Version Check</button>
+        <button class="test-button" onclick="clearLog()">Clear Log</button>
+    </div>
+
     <div class="test-section">
         <h2>Test Results</h2>
-        <div id="test-results"></div>
-    </div>
-    
-    <div class="test-section">
-        <h2>Actions</h2>
-        <button onclick="regenerateVersion()">Regenerate Version</button>
-        <button onclick="openMainApp()">Open Main App</button>
+        <div id="status"></div>
+        <div id="log" class="log"></div>
     </div>
 
-    <script src="version.js"></script>
     <script>
-        function addTestResult(message, type = 'info') {
-            const resultsDiv = document.getElementById('test-results');
-            const resultDiv = document.createElement('div');
-            resultDiv.className = `test-result ${type}`;
-            resultDiv.textContent = message;
-            resultsDiv.appendChild(resultDiv);
+        // Simulate the version checking logic from the main app
+        let lastKnownVersion = null;
+        let versionCheckInterval = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: #666;">[${timestamp}]</span> ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
         }
 
-        function displayVersionInfo() {
-            const versionInfoDiv = document.getElementById('version-info');
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('status').innerHTML = '';
+        }
+
+        function checkForVersionUpdate() {
+            // Get current version from the display
+            const currentVersionElement = document.getElementById('current-version');
+            if (!currentVersionElement) return;
             
-            if (window.GIT_VERSION) {
-                versionInfoDiv.innerHTML = `
-                    <div class="version-display">
-                        <strong>Version:</strong> ${window.GIT_VERSION.version}<br>
-                        <strong>Commit Hash:</strong> ${window.GIT_VERSION.commitHash}<br>
-                        <strong>Short Hash:</strong> ${window.GIT_VERSION.shortHash}<br>
-                        <strong>Commit Date:</strong> ${window.GIT_VERSION.commitDate}<br>
-                        <strong>Commit Message:</strong> ${window.GIT_VERSION.commitMessage}<br>
-                        <strong>Build Date:</strong> ${window.GIT_VERSION.buildDate}
-                    </div>
-                `;
+            const currentVersion = currentVersionElement.textContent.replace('v', '');
+            
+            // If this is the first check, just store the version
+            if (lastKnownVersion === null) {
+                lastKnownVersion = currentVersion;
+                log(`Initial version check: ${currentVersion}`);
+                return;
+            }
+            
+            // Check if version has changed
+            if (currentVersion !== lastKnownVersion) {
+                log(`Version changed from ${lastKnownVersion} to ${currentVersion}`);
+                log('This would trigger a service worker update check in the main app');
+                log('This would show an update notification to the user');
+                
+                // Update the stored version
+                lastKnownVersion = currentVersion;
+                
+                showStatus(`Version update detected: ${lastKnownVersion} → ${currentVersion}`, 'success');
             } else {
-                versionInfoDiv.innerHTML = `
-                    <div class="version-display">
-                        <strong>Error:</strong> GIT_VERSION not found
-                    </div>
-                `;
+                log(`Version unchanged: ${currentVersion}`);
             }
         }
 
-        function regenerateVersion() {
-            // This would normally call the Node.js script
-            // For this test, we'll just reload the page
-            location.reload();
+        function simulateVersionChange(newVersion) {
+            const versionElement = document.getElementById('current-version');
+            const oldVersion = versionElement.textContent;
+            versionElement.textContent = `v${newVersion}`;
+            
+            log(`Simulated version change: ${oldVersion} → v${newVersion}`);
+            showStatus(`Version changed to v${newVersion}`, 'info');
+            
+            // Trigger version check
+            setTimeout(() => {
+                checkForVersionUpdate();
+            }, 100);
         }
 
-        function openMainApp() {
-            window.open('http://localhost:8000', '_blank');
+        function resetVersion() {
+            const versionElement = document.getElementById('current-version');
+            versionElement.textContent = 'v1.0.0';
+            lastKnownVersion = null;
+            
+            log('Reset version to v1.0.0 and cleared version history');
+            showStatus('Version reset to v1.0.0', 'info');
         }
 
-        // Run tests when page loads
-        window.addEventListener('load', function() {
-            displayVersionInfo();
-            
-            // Test 1: Check if GIT_VERSION exists
-            if (window.GIT_VERSION) {
-                addTestResult('✅ GIT_VERSION object exists', 'pass');
-            } else {
-                addTestResult('❌ GIT_VERSION object is missing', 'fail');
+        function testVersionCheck() {
+            log('Manual version check triggered');
+            checkForVersionUpdate();
+        }
+
+        function startVersionChecking() {
+            if (versionCheckInterval) {
+                clearInterval(versionCheckInterval);
             }
             
-            // Test 2: Check if version property exists
-            if (window.GIT_VERSION && window.GIT_VERSION.version) {
-                addTestResult(`✅ Version: ${window.GIT_VERSION.version}`, 'pass');
-            } else {
-                addTestResult('❌ Version property is missing', 'fail');
-            }
+            log('Starting version checking (every 5 seconds for testing)');
+            versionCheckInterval = setInterval(() => {
+                checkForVersionUpdate();
+            }, 5000); // Check every 5 seconds for testing
             
-            // Test 3: Check if commit hash exists
-            if (window.GIT_VERSION && window.GIT_VERSION.commitHash) {
-                addTestResult(`✅ Commit Hash: ${window.GIT_VERSION.commitHash}`, 'pass');
-            } else {
-                addTestResult('❌ Commit Hash is missing', 'fail');
+            // Also check immediately
+            checkForVersionUpdate();
+        }
+
+        function stopVersionChecking() {
+            if (versionCheckInterval) {
+                clearInterval(versionCheckInterval);
+                versionCheckInterval = null;
+                log('Stopped version checking');
             }
-            
-            // Test 4: Check version format
-            if (window.GIT_VERSION && window.GIT_VERSION.version) {
-                const version = window.GIT_VERSION.version;
-                if (version.startsWith('v') || version.startsWith('dev-') || version === 'unknown') {
-                    addTestResult('✅ Version format is valid', 'pass');
-                } else {
-                    addTestResult('❌ Version format is invalid', 'fail');
-                }
-            }
-            
-            addTestResult('ℹ️ Version system is ready for deployment', 'info');
+        }
+
+        // Initialize
+        log('Version check test page loaded');
+        log('Click "Test Version Check" to run the first check');
+        log('Click version buttons to simulate version changes');
+        log('The system will detect changes and log what would happen in the main app');
+        
+        // Start version checking
+        startVersionChecking();
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stopVersionChecking();
         });
     </script>
 </body>
