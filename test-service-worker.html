@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Worker Update Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .status-display {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Service Worker Update Test</h1>
+    
+    <div class="test-section">
+        <h2>Service Worker Status</h2>
+        <div id="sw-status"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Results</h2>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Actions</h2>
+        <button onclick="checkForUpdates()">Check for Updates</button>
+        <button onclick="forceUpdate()">Force Update</button>
+        <button onclick="openMainApp()">Open Main App</button>
+    </div>
+
+    <script>
+        let swRegistration = null;
+        let updateAvailable = false;
+
+        function addTestResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function updateStatus() {
+            const statusDiv = document.getElementById('sw-status');
+            
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistration().then(registration => {
+                    if (registration) {
+                        swRegistration = registration;
+                        statusDiv.innerHTML = `
+                            <div class="status-display">
+                                <strong>Service Worker:</strong> ${registration.active ? 'Active' : 'Inactive'}<br>
+                                <strong>Update Available:</strong> ${updateAvailable ? 'Yes' : 'No'}<br>
+                                <strong>Waiting:</strong> ${registration.waiting ? 'Yes' : 'No'}<br>
+                                <strong>Installing:</strong> ${registration.installing ? 'Yes' : 'No'}<br>
+                                <strong>Controller:</strong> ${navigator.serviceWorker.controller ? 'Yes' : 'No'}
+                            </div>
+                        `;
+                    } else {
+                        statusDiv.innerHTML = `
+                            <div class="status-display">
+                                <strong>Service Worker:</strong> Not registered
+                            </div>
+                        `;
+                    }
+                });
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="status-display">
+                        <strong>Service Worker:</strong> Not supported
+                    </div>
+                `;
+            }
+        }
+
+        function checkForUpdates() {
+            if (swRegistration) {
+                addTestResult('Checking for Service Worker updates...', 'info');
+                swRegistration.update()
+                    .then(() => {
+                        addTestResult('✅ Update check completed', 'pass');
+                        updateStatus();
+                    })
+                    .catch(error => {
+                        addTestResult(`❌ Update check failed: ${error.message}`, 'fail');
+                    });
+            } else {
+                addTestResult('❌ No Service Worker registration found', 'fail');
+            }
+        }
+
+        function forceUpdate() {
+            if (swRegistration && swRegistration.waiting) {
+                addTestResult('🔄 Forcing Service Worker update...', 'info');
+                swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            } else {
+                addTestResult('❌ No waiting Service Worker found', 'fail');
+            }
+        }
+
+        function openMainApp() {
+            window.open('http://localhost:8000', '_blank');
+        }
+
+        // Set up Service Worker monitoring
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', event => {
+                if (event.data && event.data.type === 'SW_UPDATED') {
+                    addTestResult(`✅ Service Worker updated: ${event.data.cacheVersion}`, 'pass');
+                    updateAvailable = true;
+                    updateStatus();
+                }
+            });
+
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                addTestResult('🔄 Service Worker controller changed', 'info');
+                updateStatus();
+            });
+        }
+
+        // Run tests when page loads
+        window.addEventListener('load', function() {
+            addTestResult('Testing Service Worker update system...', 'info');
+            
+            // Test 1: Check if Service Worker is supported
+            if ('serviceWorker' in navigator) {
+                addTestResult('✅ Service Worker is supported', 'pass');
+            } else {
+                addTestResult('❌ Service Worker is not supported', 'fail');
+            }
+            
+            // Test 2: Check if Service Worker is registered
+            navigator.serviceWorker.getRegistration().then(registration => {
+                if (registration) {
+                    addTestResult('✅ Service Worker is registered', 'pass');
+                    swRegistration = registration;
+                    
+                    // Test 3: Check for updates
+                    registration.addEventListener('updatefound', () => {
+                        addTestResult('✅ Service Worker update found', 'pass');
+                        updateAvailable = true;
+                        updateStatus();
+                    });
+                    
+                    // Check for waiting service worker
+                    if (registration.waiting) {
+                        addTestResult('✅ Waiting Service Worker found', 'pass');
+                        updateAvailable = true;
+                    }
+                } else {
+                    addTestResult('❌ Service Worker is not registered', 'fail');
+                }
+                
+                updateStatus();
+            });
+            
+            addTestResult('ℹ️ Service Worker update system is ready', 'info');
+        });
+    </script>
+</body>
+</html> 

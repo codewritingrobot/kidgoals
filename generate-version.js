@@ -42,7 +42,8 @@ function getGitInfo() {
             shortHash,
             commitDate,
             commitMessage,
-            buildDate: new Date().toISOString()
+            buildDate: new Date().toISOString(),
+            cacheVersion: `kidgoals-${shortHash}` // Use commit hash for cache versioning
         };
     } catch (error) {
         return {
@@ -51,7 +52,8 @@ function getGitInfo() {
             shortHash: 'unknown',
             commitDate: 'unknown',
             commitMessage: 'unknown',
-            buildDate: new Date().toISOString()
+            buildDate: new Date().toISOString(),
+            cacheVersion: 'kidgoals-unknown'
         };
     }
 }

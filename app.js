@@ -89,6 +89,11 @@ let isOnline = navigator.onLine;
 let syncInterval = null;
 let isSyncing = false; // Add sync lock to prevent race conditions
 
+// Service Worker Management
+let swRegistration = null;
+let swUpdateInterval = null;
+let swUpdateAvailable = false;
+
 // Enhanced sync system
 let syncQueue = []; // Queue for pending sync operations
 let pendingOperations = new Map(); // Track pending operations by ID
@@ -100,6 +105,162 @@ const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 const SELECTED_CHILD_KEY = 'kidgoals_selectedChild';
 const LOCAL_DATA_KEY = 'kidgoals_local_data';
 const SYNC_TIME_KEY = 'kidgoals_last_sync';
+
+// Service Worker Management Functions
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+                swRegistration = registration;
+                console.log('Service Worker registered successfully:', registration);
+                
+                // Set up update checking
+                setupServiceWorkerUpdates(registration);
+                
+                // Listen for controller changes (new SW takes control)
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    console.log('Service Worker controller changed - reloading app');
+                    showUpdateNotification();
+                });
+                
+                // Listen for messages from service worker
+                navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+                
+                // Send cache version to service worker
+                if (window.GIT_VERSION && window.GIT_VERSION.cacheVersion) {
+                    registration.active.postMessage({
+                        type: 'SET_CACHE_VERSION',
+                        cacheVersion: window.GIT_VERSION.cacheVersion
+                    });
+                }
+                
+                // Check for updates immediately
+                checkForServiceWorkerUpdate();
+                
+                // Set up periodic update checks (every hour)
+                swUpdateInterval = setInterval(() => {
+                    checkForServiceWorkerUpdate();
+                }, 1000 * 60 * 60); // Every hour
+            })
+            .catch(error => {
+                console.error('Service Worker registration failed:', error);
+            });
+    }
+}
+
+function setupServiceWorkerUpdates(registration) {
+    // Listen for updates
+    registration.addEventListener('updatefound', () => {
+        console.log('Service Worker update found');
+        const newWorker = registration.installing;
+        
+        newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('New Service Worker installed and ready');
+                swUpdateAvailable = true;
+                showUpdateNotification();
+            }
+        });
+    });
+}
+
+function checkForServiceWorkerUpdate() {
+    if (swRegistration) {
+        console.log('Checking for Service Worker updates...');
+        swRegistration.update()
+            .then(() => {
+                console.log('Service Worker update check completed');
+            })
+            .catch(error => {
+                console.error('Service Worker update check failed:', error);
+            });
+    }
+}
+
+function handleServiceWorkerMessage(event) {
+    if (event.data && event.data.type === 'SW_UPDATED') {
+        console.log('Service Worker updated:', event.data);
+        showUpdateNotification();
+    }
+}
+
+function showUpdateNotification() {
+    // Create update notification
+    const notification = document.createElement('div');
+    notification.id = 'update-notification';
+    notification.innerHTML = `
+        <div class="update-notification-content">
+            <div class="update-notification-text">
+                <span>🔄 New version available</span>
+                <button onclick="applyUpdate()" class="update-btn">Update Now</button>
+            </div>
+        </div>
+    `;
+    
+    // Add styles
+    notification.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: #007AFF;
+        color: white;
+        padding: 12px;
+        text-align: center;
+        z-index: 10000;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    `;
+    
+    // Add button styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .update-notification-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+        .update-btn {
+            background: white;
+            color: #007AFF;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .update-btn:hover {
+            background: #f0f0f0;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto-hide after 10 seconds if not clicked
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 10000);
+}
+
+function applyUpdate() {
+    if (swRegistration && swRegistration.waiting) {
+        // Send message to waiting service worker to skip waiting
+        swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+        // Force reload to pick up new service worker
+        window.location.reload();
+    }
+}
+
+// Make applyUpdate globally available
+window.applyUpdate = applyUpdate;
 
 // DOM Elements
 const elements = {
@@ -1736,6 +1897,9 @@ function handleAddChildSubmit(e) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Register Service Worker first
+    registerServiceWorker();
+    
     // Set up network status monitoring
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
@@ -1918,6 +2082,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } else {
             alert('Cannot sync: offline or not authenticated');
+        }
+    });
+    
+    // Clean up intervals when page unloads
+    window.addEventListener('beforeunload', () => {
+        if (swUpdateInterval) {
+            clearInterval(swUpdateInterval);
+        }
+        if (syncInterval) {
+            clearInterval(syncInterval);
         }
     });
 });
