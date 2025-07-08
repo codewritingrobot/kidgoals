@@ -1095,17 +1095,25 @@ function openEditChildModal(child) {
 }
 
 function renderGoals() {
+    console.log('renderGoals called');
+    console.log('Selected child ID:', selectedChildId);
+    console.log('Total goals available:', goals.length);
+    console.log('Goals:', goals);
+    
     if (!selectedChildId) {
+        console.log('No child selected, showing placeholder');
         elements.goalsList.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">Select a child to see their goals</p>';
         return;
     }
     
     // Get all goals that include the selected child
     let relevantGoals = goals.filter(goal => goal.childId === selectedChildId);
+    console.log(`Found ${relevantGoals.length} goals for selected child ${selectedChildId}:`, relevantGoals);
     
     // Also include goals from groups that contain the selected child
     const groupIds = relevantGoals.map(goal => goal.groupId).filter(Boolean);
     const groupGoals = goals.filter(goal => groupIds.includes(goal.groupId));
+    console.log(`Found ${groupGoals.length} group goals:`, groupGoals);
     
     // Combine and deduplicate by groupId, keeping one goal per group
     const allRelevantGoals = [...relevantGoals, ...groupGoals];
@@ -1124,12 +1132,17 @@ function renderGoals() {
         }
     });
     
+    console.log(`Final unique goals to render: ${uniqueGoals.length}`, uniqueGoals);
+    
     if (uniqueGoals.length === 0) {
+        console.log('No goals to display, showing empty state');
         elements.goalsList.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">No goals yet. Create your first goal!</p>';
         return;
     }
     
+    console.log('Rendering goal cards...');
     elements.goalsList.innerHTML = uniqueGoals.map(goal => createGoalCard(goal)).join('');
+    console.log('Goal rendering completed');
 }
 
 function calculateMilestones(goal) {
@@ -1919,6 +1932,8 @@ document.addEventListener('DOMContentLoaded', () => {
             repeat: repeat
         };
         
+        console.log('Goal data being sent to server:', goalData);
+        
         // Add timer-specific data if it's a timer goal
         if (goalType === 'timer') {
             goalData.duration = parseInt(document.getElementById('goal-timer-duration').value);
@@ -2065,6 +2080,31 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Cannot refresh data: offline or not authenticated');
         }
     });
+    
+    // Add a refresh button to the goals section for easier access
+    const refreshGoalsBtn = document.createElement('button');
+    refreshGoalsBtn.textContent = '🔄 Refresh Goals';
+    refreshGoalsBtn.className = 'btn-secondary';
+    refreshGoalsBtn.style.margin = '10px';
+    refreshGoalsBtn.onclick = () => {
+        if (isOnline && authToken && currentUser) {
+            refreshGoalsBtn.textContent = '⏳ Loading...';
+            refreshGoalsBtn.disabled = true;
+            console.log('Manual goals refresh clicked');
+            loadDataFromServer().finally(() => {
+                refreshGoalsBtn.textContent = '🔄 Refresh Goals';
+                refreshGoalsBtn.disabled = false;
+            });
+        } else {
+            alert('Cannot refresh data: offline or not authenticated');
+        }
+    };
+    
+    // Insert the refresh button before the goals list
+    const goalsContainer = document.getElementById('goals-container');
+    if (goalsContainer) {
+        goalsContainer.insertBefore(refreshGoalsBtn, goalsContainer.firstChild);
+    }
     
     // Clean up intervals when page unloads
     window.addEventListener('beforeunload', () => {
@@ -2471,6 +2511,8 @@ async function createGoalOnServer(goalData) {
         throw new Error('Cannot create goal: offline or not authenticated');
     }
     
+    console.log('Creating goal on server:', goalData);
+    
     const response = await apiCall(API_ENDPOINTS.GOALS, {
         method: 'POST',
         body: JSON.stringify({
@@ -2479,10 +2521,15 @@ async function createGoalOnServer(goalData) {
         })
     });
     
+    console.log('Server response for goal creation:', response);
+    console.log(`Server returned ${response.children?.length || 0} children and ${response.goals?.length || 0} goals`);
+    
     // Update local state with server response
     children = response.children || [];
     goals = response.goals || [];
     lastSyncTime = response.lastSyncTime || Date.now();
+    
+    console.log(`Updated local state: ${children.length} children, ${goals.length} goals`);
     
     // Save to local storage
     saveLocalData();
@@ -2491,6 +2538,8 @@ async function createGoalOnServer(goalData) {
     // Update UI
     renderChildAvatars();
     renderGoals();
+    
+    console.log('Goal creation completed, UI updated');
     
     return response;
 }
