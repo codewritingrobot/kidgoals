@@ -1090,6 +1090,12 @@ function setupEventListeners() {
     initializeColorPicker('edit-child-color', '#007AFF');
     initializeAvatarPicker('add-child-avatar', '🦊');
     initializeAvatarPicker('edit-child-avatar', '🦊');
+
+    // Patch: Ensure color picker and child selector are rendered when Add Goal modal opens
+    const addGoalBtn = document.getElementById('add-goal-btn');
+    if (addGoalBtn) {
+        addGoalBtn.onclick = showAddGoalModal;
+    }
 }
 
 function initializeColorPicker(containerId, defaultColor) {
@@ -1223,3 +1229,30 @@ window.KidGoals = {
     selectChild,
     logout
 };
+
+// Patch: Show Add Goal Modal with proper initialization
+function showAddGoalModal() {
+    // Initialize color picker
+    initializeColorPicker('goal-color', COLORS[0]);
+    // Render children multiselect
+    const childrenContainer = document.getElementById('goal-children');
+    childrenContainer.innerHTML = '';
+    if (children.length === 0) {
+        childrenContainer.innerHTML = '<div style="color:#888;">No children available. Please add a child first.</div>';
+        document.querySelector('#add-goal-form button[type="submit"]').disabled = true;
+    } else {
+        children.forEach(child => {
+            const label = document.createElement('label');
+            label.style.display = 'inline-flex';
+            label.style.alignItems = 'center';
+            label.style.marginRight = '12px';
+            label.style.marginBottom = '8px';
+            label.innerHTML = `
+                <input type="checkbox" name="children" value="${child.id}" style="margin-right:6px;">${child.avatar} ${child.name}
+            `;
+            childrenContainer.appendChild(label);
+        });
+        document.querySelector('#add-goal-form button[type="submit"]').disabled = false;
+    }
+    showModal('add-goal-modal');
+}
