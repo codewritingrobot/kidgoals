@@ -6,6 +6,8 @@ const AWS = require('aws-sdk');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const validator = require('validator');
 require('dotenv').config();
 
 const app = express();
@@ -23,7 +25,25 @@ const ses = new AWS.SES({ region: process.env.AWS_REGION || 'us-east-1' });
 
 // Middleware
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.mcsoko.com"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
 }));
 
 // CORS configuration
@@ -35,8 +55,16 @@ const corsOptions = {
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
-    // Allow requests with no origin (like mobile apps or Postman)
-    if (!origin) return callback(null, true);
+    // In production, don't allow requests with no origin
+    if (process.env.NODE_ENV === 'production' && !origin) {
+      console.log('CORS blocked null origin in production');
+      return callback(new Error('Not allowed by CORS'));
+    }
+    
+    // Allow requests with no origin only in development
+    if (!origin && process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
@@ -47,7 +75,8 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  maxAge: 86400 // Cache preflight for 24 hours
 };
 
 app.use(cors(corsOptions));
@@ -65,8 +94,12 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// JWT Secret - fail fast if not configured
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('JWT_SECRET environment variable is required');
+  process.exit(1);
+}
 
 // Database table names
 const TABLES = {
@@ -77,7 +110,7 @@ const TABLES = {
 
 // Utility functions
 function generateMagicCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 999999).toString();
 }
 
 function generateJWT(email) {
@@ -199,7 +232,7 @@ app.post('/api/auth/send-code', async (req, res) => {
   try {
     const { email } = req.body;
     
-    if (!email || !email.includes('@')) {
+    if (!email || !validator.isEmail(email)) {
       return res.status(400).json({ error: 'Valid email required' });
     }
 
@@ -236,8 +269,8 @@ app.post('/api/auth/verify-code', async (req, res) => {
   try {
     const { email, code } = req.body;
     
-    if (!email || !code) {
-      return res.status(400).json({ error: 'Email and code required' });
+    if (!email || !validator.isEmail(email) || !code) {
+      return res.status(400).json({ error: 'Valid email and code required' });
     }
 
     // Get magic code from DynamoDB
