@@ -368,7 +368,7 @@ app.post('/api/user/data', authenticateToken, async (req, res) => {
   }
 });
 
-// Sync data (merge local and server data)
+// Sync data (merge local and server data) - Fixed sync logic to return correct data
 app.post('/api/user/sync', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
