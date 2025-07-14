@@ -346,6 +346,44 @@ function convertToMilliseconds(duration, unit) {
     return duration * (multipliers[unit] || 1000);
 }
 
+// Helper functions for recurring goals
+function getCurrentPeriodStart(type) {
+    const now = new Date();
+    if (type === 'daily') {
+        // Start of current day (midnight)
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    } else if (type === 'weekly') {
+        // Start of current week (Sunday midnight)
+        const dayOfWeek = now.getDay();
+        const daysToSubtract = dayOfWeek === 0 ? 0 : dayOfWeek; // Sunday is 0
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToSubtract).getTime();
+    }
+    return now.getTime();
+}
+
+function getCurrentPeriodEnd(type) {
+    const now = new Date();
+    if (type === 'daily') {
+        // End of current day (next midnight)
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+    } else if (type === 'weekly') {
+        // End of current week (next Sunday midnight)
+        const dayOfWeek = now.getDay();
+        const daysToAdd = 7 - dayOfWeek;
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysToAdd).getTime();
+    }
+    return now.getTime();
+}
+
+function isGoalInCurrentPeriod(goal) {
+    if (!goal.repeatSchedule) return true;
+    
+    const now = Date.now();
+    const { startDate, endDate } = goal.repeatSchedule;
+    
+    return now >= startDate && now < endDate;
+}
+
 function formatSimpleTime(milliseconds, type) {
     if (type === 'timer') {
         const seconds = Math.floor(milliseconds / 1000);
@@ -801,14 +839,19 @@ function calculateProgress(goal) {
     if (goal.status === 'completed') return 100;
     
     switch (goal.type) {
-        case 'countdown':
+        case 'daily':
+        case 'weekly':
+            // For recurring goals, check if we're in the current period
+            if (!isGoalInCurrentPeriod(goal)) {
+                return 0; // Goal is not active in current period
+            }
             return Math.min(100, ((goal.current || 0) / goal.target) * 100);
+        case 'countdown':
         case 'countup':
             return Math.min(100, ((goal.current || 0) / goal.target) * 100);
         case 'timer':
             const elapsed = Date.now() - goal.startTime;
             return Math.min(100, (elapsed / goal.totalDuration) * 100);
-
         default:
             return goal.progress || 0;
     }
@@ -1062,19 +1105,30 @@ function setupEventListeners() {
             e.preventDefault();
             
             const formData = new FormData(addGoalForm);
+            const colorContainer = document.getElementById('goal-color');
+            
             const goalData = {
                 name: formData.get('name').trim(),
                 type: formData.get('type'),
-                color: formData.get('color'),
+                color: colorContainer.dataset.selectedColor || '#007AFF',
                 childIds: Array.from(formData.getAll('children'))
             };
             
             // Add type-specific data
-            if (goalData.type === 'timer') {
+            if (goalData.type === 'daily' || goalData.type === 'weekly') {
+                goalData.target = parseInt(formData.get('target'));
+                goalData.current = 0;
+                goalData.repeat = formData.get('repeat') === 'on';
+                goalData.repeatSchedule = {
+                    type: goalData.type,
+                    startDate: getCurrentPeriodStart(goalData.type),
+                    endDate: getCurrentPeriodEnd(goalData.type)
+                };
+            } else if (goalData.type === 'timer') {
                 goalData.duration = parseInt(formData.get('duration'));
                 goalData.unit = formData.get('unit');
-                goalData.timerType = formData.get('timerType');
                 goalData.totalDuration = convertToMilliseconds(goalData.duration, goalData.unit);
+                goalData.startTime = Date.now();
             } else if (goalData.type === 'countdown' || goalData.type === 'countup') {
                 goalData.target = parseInt(formData.get('target'));
                 goalData.current = 0;
@@ -1085,13 +1139,54 @@ function setupEventListeners() {
                 return;
             }
             
+            // Validate type-specific requirements
+            if ((goalData.type === 'daily' || goalData.type === 'weekly') && !goalData.target) {
+                showError('Please enter a target for daily/weekly goals');
+                return;
+            }
+            
+            if (goalData.type === 'timer' && !goalData.duration) {
+                showError('Please enter a duration for timer goals');
+                return;
+            }
+            
+            if ((goalData.type === 'countdown' || goalData.type === 'countup') && !goalData.target) {
+                showError('Please enter a target for count goals');
+                return;
+            }
+            
             try {
                 await createGoal(goalData);
                 addGoalForm.reset();
+                // Reset the color picker
+                colorContainer.dataset.selectedColor = '';
+                colorContainer.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
             } catch (error) {
                 console.error('Failed to create goal:', error);
             }
         });
+        
+        // Add goal type change handler
+        const goalTypeSelect = document.getElementById('goal-type');
+        if (goalTypeSelect) {
+            goalTypeSelect.addEventListener('change', function() {
+                const selectedType = this.value;
+                
+                // Hide all option groups
+                document.getElementById('recurring-options').style.display = 'none';
+                document.getElementById('timer-options').style.display = 'none';
+                document.getElementById('count-options').style.display = 'none';
+                
+                // Show relevant option group
+                if (selectedType === 'daily' || selectedType === 'weekly') {
+                    document.getElementById('recurring-options').style.display = 'block';
+                } else if (selectedType === 'timer') {
+                    document.getElementById('timer-options').style.display = 'block';
+                } else if (selectedType === 'countdown' || selectedType === 'countup') {
+                    document.getElementById('count-options').style.display = 'block';
+                }
+            });
+        }
     }
     
     // Logout button

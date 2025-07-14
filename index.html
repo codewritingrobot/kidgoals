@@ -156,30 +156,43 @@
                 <div class="form-group">
                     <label for="goal-type">Goal Type</label>
                     <select id="goal-type" name="type" required>
+                        <option value="daily">Daily Goal</option>
+                        <option value="weekly">Weekly Goal</option>
                         <option value="timer">Timer Goal</option>
                         <option value="countdown">Countdown Goal</option>
                         <option value="countup">Count Up Goal</option>
                     </select>
                 </div>
+                
+                <!-- Daily/Weekly Goal Options -->
+                <div class="form-group" id="recurring-options" style="display: none;">
+                    <label for="goal-target">Target</label>
+                    <input type="number" id="goal-target" name="target" min="1" placeholder="e.g., 3 times per day/week">
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="goal-repeat" name="repeat">
+                            Repeat automatically
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Timer Goal Options -->
                 <div class="form-group" id="timer-options" style="display: none;">
                     <label for="timer-duration">Duration</label>
                     <div class="duration-input">
-                        <input type="number" id="timer-duration" name="duration" min="1">
+                        <input type="number" id="timer-duration" name="duration" min="1" placeholder="e.g., 30">
                         <select id="timer-unit" name="unit">
                             <option value="minutes">Minutes</option>
                             <option value="hours">Hours</option>
-                            <option value="days">Days</option>
                         </select>
                     </div>
-                    <label for="timer-type">Timer Type</label>
-                    <select id="timer-type" name="timerType">
-                        <option value="countdown">Countdown</option>
-                        <option value="countup">Count Up</option>
-                    </select>
                 </div>
+                
+                <!-- Count Goal Options -->
                 <div class="form-group" id="count-options" style="display: none;">
                     <label for="count-target">Target</label>
-                    <input type="number" id="count-target" name="target" min="1">
+                    <input type="number" id="count-target" name="target" min="1" placeholder="e.g., 10">
                 </div>
 
 

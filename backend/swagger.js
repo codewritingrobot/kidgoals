@@ -153,7 +153,7 @@ const options = {
             },
             type: {
               type: 'string',
-              enum: ['timer', 'countdown', 'countup'],
+              enum: ['daily', 'weekly', 'timer', 'countdown', 'countup'],
               description: 'Type of goal'
             },
             color: {
@@ -233,6 +233,19 @@ const options = {
               type: 'integer',
               format: 'int64',
               description: 'Timestamp when goal was last updated'
+            },
+            iterationCount: {
+              type: 'number',
+              description: 'Number of times this goal has been completed (for streaks, etc.)'
+            },
+            streak: {
+              type: 'number',
+              description: 'Current streak of successful completions'
+            },
+            lastCompleted: {
+              type: 'integer',
+              format: 'int64',
+              description: 'Timestamp when goal was last completed (for streaks)'
             }
           }
         },
@@ -246,7 +259,7 @@ const options = {
             },
             type: {
               type: 'string',
-              enum: ['timer', 'countdown', 'countup'],
+              enum: ['daily', 'weekly', 'timer', 'countdown', 'countup'],
               description: 'Type of goal'
             },
             childIds: {

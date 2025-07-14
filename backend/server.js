@@ -860,20 +860,22 @@ app.post('/api/goals', authenticateToken, async (req, res) => {
         repeat: goalData.repeat || false,
         repeatSchedule: goalData.repeatSchedule || null,
         progress: 0,
-        completedAt: null
+        completedAt: null,
+        iterationCount: 0,
+        streak: 0,
+        lastCompleted: null
       };
       
       // Add timer-specific properties
       if (goalData.type === 'timer') {
         goal.duration = goalData.duration;
         goal.unit = goalData.unit;
-        goal.timerType = goalData.timerType;
         goal.totalDuration = goalData.totalDuration;
-        goal.themeType = goalData.timerType;
+        goal.themeType = 'timer';
       }
       
       // Add count-specific properties
-      if (goalData.type === 'countdown' || goalData.type === 'countup') {
+      if (goalData.type === 'countdown' || goalData.type === 'countup' || goalData.type === 'daily' || goalData.type === 'weekly') {
         goal.target = goalData.target;
         goal.current = goalData.current || 0;
       }
@@ -1006,11 +1008,34 @@ app.put('/api/goals/:id', authenticateToken, async (req, res) => {
     }
     
     // Update goal
-    userData.goals[goalIndex] = {
-      ...userData.goals[goalIndex],
+    const prevGoal = userData.goals[goalIndex];
+    const wasCompleted = prevGoal.status === 'completed';
+    const willBeCompleted = updates.status === 'completed';
+    let updatedGoal = {
+      ...prevGoal,
       ...updates,
       updatedAt: Date.now()
     };
+
+    // If goal is being completed now (and wasn't before), update streak/iteration
+    if (!wasCompleted && willBeCompleted) {
+      updatedGoal.iterationCount = (prevGoal.iterationCount || 0) + 1;
+      updatedGoal.lastCompleted = Date.now();
+      // Handle streaks for daily/weekly
+      if (prevGoal.type === 'daily' || prevGoal.type === 'weekly') {
+        const now = Date.now();
+        const lastCompleted = prevGoal.lastCompleted || 0;
+        let periodMs = 24 * 60 * 60 * 1000; // daily
+        if (prevGoal.type === 'weekly') periodMs = 7 * 24 * 60 * 60 * 1000;
+        // If last completed was in the previous period, increment streak
+        if (lastCompleted > 0 && now - lastCompleted <= periodMs * 1.5) {
+          updatedGoal.streak = (prevGoal.streak || 0) + 1;
+        } else {
+          updatedGoal.streak = 1;
+        }
+      }
+    }
+    userData.goals[goalIndex] = updatedGoal;
     
     userData.updatedAt = Date.now();
     
