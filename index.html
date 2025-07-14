@@ -255,6 +255,66 @@
         </div>
     </div>
 
+    <!-- Completion History Modal -->
+    <div id="completion-history-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Completion History</h3>
+                <button class="close-btn" onclick="hideModal('completion-history-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="completion-stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-completions">0</div>
+                        <div class="stat-label">Total Completions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="current-streak">0</div>
+                        <div class="stat-label">Current Streak</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="longest-streak">0</div>
+                        <div class="stat-label">Longest Streak</div>
+                    </div>
+                </div>
+                
+                <div class="completion-filters">
+                    <button class="filter-btn active" data-filter="all">All Time</button>
+                    <button class="filter-btn" data-filter="week">This Week</button>
+                    <button class="filter-btn" data-filter="month">This Month</button>
+                </div>
+                
+                <div class="completion-insights" id="completion-insights" style="display: none;">
+                    <h4>📈 Insights</h4>
+                    <div class="insights-grid">
+                        <div class="insight-item">
+                            <div class="insight-label">Average per day</div>
+                            <div class="insight-value" id="avg-per-day">-</div>
+                        </div>
+                        <div class="insight-item">
+                            <div class="insight-label">Best day</div>
+                            <div class="insight-value" id="best-day">-</div>
+                        </div>
+                        <div class="insight-item">
+                            <div class="insight-label">Notes added</div>
+                            <div class="insight-value" id="notes-count">-</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="completion-list" id="completion-list">
+                    <!-- Completion history will be populated dynamically -->
+                </div>
+                
+                <div class="completion-empty" id="completion-empty" style="display: none;">
+                    <div class="empty-icon">📊</div>
+                    <h4>No completions yet</h4>
+                    <p>Complete this goal to see your progress history!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Network Status -->
     <div id="network-status" class="status online" style="position: fixed; top: 10px; right: 10px; z-index: 1000; padding: 5px 10px; border-radius: 4px; font-size: 12px;">
         🟢 Online

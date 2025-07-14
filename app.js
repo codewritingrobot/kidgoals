@@ -24,7 +24,10 @@ const API_ENDPOINTS = {
     CHILDREN: '/api/children',
     GOALS: '/api/goals',
     USER_DATA: '/api/user/data',
-    HEALTH: '/health'
+    HEALTH: '/health',
+    GOAL_COMPLETE: (goalId) => `/api/goals/${goalId}/complete`,
+    GOAL_COMPLETIONS: (goalId) => `/api/goals/${goalId}/completions`,
+    GOAL_STATS: (goalId) => `/api/goals/${goalId}/stats`
 };
 
 // Story themes for different goal types
@@ -244,7 +247,7 @@ async function loadAllData() {
     try {
         await Promise.all([loadChildren(), loadGoals()]);
         renderChildAvatars();
-        renderGoals();
+        await renderGoals();
     } catch (error) {
         console.error('Failed to load data:', error);
         showError('Failed to load data. Please try again.');
@@ -597,11 +600,11 @@ function showDashboard() {
     document.getElementById('dashboard').style.display = 'block';
 }
 
-function selectChild(childId) {
+async function selectChild(childId) {
     selectedChildId = childId;
     saveSelectedChild(childId);
     renderChildAvatars();
-    renderGoals();
+    await renderGoals();
 }
 
 function renderChildAvatars() {
@@ -692,7 +695,7 @@ function openEditChildModal(child) {
     showModal('edit-child-modal');
 }
 
-function renderGoals() {
+async function renderGoals() {
     const container = document.getElementById('goals-container');
     if (!container) return;
     
@@ -754,11 +757,15 @@ function renderGoals() {
         }
     });
     
-    Object.values(goalGroups).forEach(goalGroup => {
+    // Create cards asynchronously
+    const cardPromises = Object.values(goalGroups).map(async (goalGroup) => {
         const goal = goalGroup[0]; // Use first goal for group info
-        const card = createGoalCard(goal, goalGroup);
-        container.appendChild(card);
+        return await createGoalCard(goal, goalGroup);
     });
+    
+    // Wait for all cards to be created and add them to the container
+    const cards = await Promise.all(cardPromises);
+    cards.forEach(card => container.appendChild(card));
 }
 
 function calculateMilestones(goal) {
@@ -790,7 +797,7 @@ function getGoalChildren(goal) {
     }
 }
 
-function createGoalCard(goal, goalGroup = [goal]) {
+async function createGoalCard(goal, goalGroup = [goal]) {
     const card = document.createElement('div');
     card.className = 'goal-card';
     card.style.borderColor = goal.color;
@@ -798,6 +805,9 @@ function createGoalCard(goal, goalGroup = [goal]) {
     const progress = calculateProgress(goal);
     const milestones = calculateMilestones(goal);
     const goalChildren = getGoalChildren(goal);
+    
+    // Get calculated stats for this goal
+    const stats = await getGoalStats(goal.id);
     
     card.innerHTML = `
         <div class="goal-header">
@@ -813,6 +823,7 @@ function createGoalCard(goal, goalGroup = [goal]) {
             </div>
             <div class="goal-actions">
                 <button onclick="openGoalDetail('${goal.id}')" class="btn-icon">👁️</button>
+                <button onclick="openCompletionHistory('${goal.id}')" class="btn-icon">📊</button>
                 <button onclick="editGoal('${goal.id}')" class="btn-icon">✏️</button>
                 <button onclick="deleteGoal('${goal.id}')" class="btn-icon">🗑️</button>
                 ${goal.status !== 'completed' ? `<button onclick="completeGoal('${goal.id}')" class="btn-icon" style="background: #34C759; color: white;">✅</button>` : `<button onclick="resetGoal('${goal.id}')" class="btn-icon" style="background: #FF9500; color: white;">🔄</button>`}
@@ -830,8 +841,9 @@ function createGoalCard(goal, goalGroup = [goal]) {
         <div class="goal-status">
             <span class="status-badge ${goal.status}">${goal.status}</span>
             ${goal.type === 'timer' ? `<span class="timer-info">${formatTimeRemaining(goal.totalDuration - (Date.now() - goal.startTime))}</span>` : ''}
-            ${goal.iterationCount > 0 ? `<span class="iteration-info">🏆 ${goal.iterationCount} completions</span>` : ''}
-            ${goal.streak > 0 ? `<span class="streak-info">🔥 ${goal.streak} streak</span>` : ''}
+            ${stats.iterationCount > 0 ? `<span class="iteration-info">🏆 ${stats.iterationCount} completions</span>` : ''}
+            ${stats.currentStreak > 0 ? `<span class="streak-info">🔥 ${stats.currentStreak} streak</span>` : ''}
+            ${stats.longestStreak > stats.currentStreak ? `<span class="longest-streak-info">⭐ ${stats.longestStreak} best</span>` : ''}
         </div>
     `;
     
@@ -908,7 +920,7 @@ async function createChild(childData) {
         
         if (children.length === 1) {
             // First child, select it
-            selectChild(newChild.id);
+            await selectChild(newChild.id);
         }
         
         hideModal('add-child-modal');
@@ -965,7 +977,7 @@ async function createGoal(goalData) {
         });
         
         await loadGoals();
-        renderGoals();
+        await renderGoals();
         
         hideModal('add-goal-modal');
         showSuccess('Goal created successfully!');
@@ -984,7 +996,7 @@ async function updateGoal(goalId, updates) {
         });
         
         await loadGoals();
-        renderGoals();
+        await renderGoals();
         return updatedGoal;
     } catch (error) {
         showError(error.message || 'Failed to update goal');
@@ -1007,16 +1019,35 @@ async function deleteGoal(goalId) {
     }
 }
 
-async function completeGoal(goalId) {
+async function completeGoal(goalId, notes = null) {
     try {
-        const updatedGoal = await apiCall(`${API_ENDPOINTS.GOALS}/${goalId}`, {
+        // Prompt for notes if not provided
+        if (notes === null) {
+            notes = prompt('Add a note about this completion (optional):');
+            if (notes === null) return; // User cancelled
+            notes = notes.trim() || null;
+        }
+        
+        // Log the completion event
+        const response = await apiCall(API_ENDPOINTS.GOAL_COMPLETE(goalId), {
+            method: 'POST',
+            body: JSON.stringify({ 
+                notes: notes,
+                completedBy: 'parent'
+            })
+        });
+        
+        // Update the goal status to completed
+        await apiCall(`${API_ENDPOINTS.GOALS}/${goalId}`, {
             method: 'PUT',
             body: JSON.stringify({ status: 'completed' })
         });
         
         await loadGoals();
-        renderGoals();
-        showSuccess(`Goal completed! Iterations: ${updatedGoal.iterationCount}, Streak: ${updatedGoal.streak}`);
+        await renderGoals();
+        
+        const { stats } = response;
+        showSuccess(`Goal completed! Iterations: ${stats.iterationCount}, Current Streak: ${stats.currentStreak}, Longest Streak: ${stats.longestStreak}`);
     } catch (error) {
         showError(error.message || 'Failed to complete goal');
         throw error;
@@ -1035,12 +1066,233 @@ async function resetGoal(goalId) {
         });
         
         await loadGoals();
-        renderGoals();
+        await renderGoals();
         showSuccess('Goal reset successfully!');
     } catch (error) {
         showError(error.message || 'Failed to reset goal');
         throw error;
     }
+}
+
+async function getGoalStats(goalId) {
+    try {
+        const stats = await apiCall(API_ENDPOINTS.GOAL_STATS(goalId), {
+            method: 'GET'
+        });
+        return stats;
+    } catch (error) {
+        console.error('Error getting goal stats:', error);
+        return {
+            iterationCount: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            lastCompleted: null,
+            completionHistory: []
+        };
+    }
+}
+
+async function getGoalCompletions(goalId, fromTimestamp = null, toTimestamp = null) {
+    try {
+        let url = API_ENDPOINTS.GOAL_COMPLETIONS(goalId);
+        const params = new URLSearchParams();
+        if (fromTimestamp) params.append('from', fromTimestamp);
+        if (toTimestamp) params.append('to', toTimestamp);
+        if (params.toString()) url += '?' + params.toString();
+        
+        const completions = await apiCall(url, {
+            method: 'GET'
+        });
+        return completions;
+    } catch (error) {
+        console.error('Error getting goal completions:', error);
+        return [];
+    }
+}
+
+// Completion history functions
+let currentHistoryGoalId = null;
+let currentHistoryFilter = 'all';
+
+function formatCompletionDate(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffTime = now - date;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+        return 'Today';
+    } else if (diffDays === 1) {
+        return 'Yesterday';
+    } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+    } else {
+        return date.toLocaleDateString();
+    }
+}
+
+function formatCompletionTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function getFilterTimestamps(filter) {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (filter) {
+        case 'week':
+            const startOfWeek = new Date(startOfDay);
+            startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+            return {
+                from: startOfWeek.getTime(),
+                to: now.getTime()
+            };
+        case 'month':
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            return {
+                from: startOfMonth.getTime(),
+                to: now.getTime()
+            };
+        default:
+            return { from: null, to: null };
+    }
+}
+
+async function openCompletionHistory(goalId) {
+    currentHistoryGoalId = goalId;
+    currentHistoryFilter = 'all';
+    
+    const goal = goals.find(g => g.id === goalId);
+    if (!goal) {
+        showError('Goal not found');
+        return;
+    }
+    
+    // Update modal title
+    const modalTitle = document.querySelector('#completion-history-modal .modal-header h3');
+    modalTitle.textContent = `Completion History - ${goal.name}`;
+    
+    // Load and display completion history
+    await loadCompletionHistory(goalId, 'all');
+    
+    // Show modal
+    showModal('completion-history-modal');
+}
+
+async function loadCompletionHistory(goalId, filter = 'all') {
+    try {
+        const { from, to } = getFilterTimestamps(filter);
+        const completions = await getGoalCompletions(goalId, from, to);
+        const stats = await getGoalStats(goalId);
+        
+        // Update stats
+        document.getElementById('total-completions').textContent = stats.iterationCount;
+        document.getElementById('current-streak').textContent = stats.currentStreak;
+        document.getElementById('longest-streak').textContent = stats.longestStreak;
+        
+        // Update filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+        
+        // Calculate and display insights
+        const insights = calculateCompletionInsights(completions);
+        const insightsSection = document.getElementById('completion-insights');
+        
+        if (insights && completions.length > 1) {
+            insightsSection.style.display = 'block';
+            document.getElementById('avg-per-day').textContent = insights.averagePerDay;
+            document.getElementById('best-day').textContent = `${insights.bestDay.count} (${insights.bestDay.date})`;
+            document.getElementById('notes-count').textContent = insights.notesCount;
+        } else {
+            insightsSection.style.display = 'none';
+        }
+        
+        // Update completion list
+        const completionList = document.getElementById('completion-list');
+        const completionEmpty = document.getElementById('completion-empty');
+        
+        if (completions.length === 0) {
+            completionList.style.display = 'none';
+            completionEmpty.style.display = 'block';
+        } else {
+            completionList.style.display = 'block';
+            completionEmpty.style.display = 'none';
+            
+            completionList.innerHTML = completions.map(completion => `
+                <div class="completion-item">
+                    <div class="completion-icon">✅</div>
+                    <div class="completion-details">
+                        <div class="completion-date">${formatCompletionDate(completion.completedAt)}</div>
+                        <div class="completion-time">${formatCompletionTime(completion.completedAt)}</div>
+                        ${completion.notes ? `<div class="completion-notes">"${completion.notes}"</div>` : ''}
+                    </div>
+                    <div class="completion-meta">
+                        <div class="completion-by">${completion.completedBy}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading completion history:', error);
+        showError('Failed to load completion history');
+    }
+}
+
+function setupCompletionHistoryFilters() {
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const filter = e.target.dataset.filter;
+            currentHistoryFilter = filter;
+            
+            if (currentHistoryGoalId) {
+                await loadCompletionHistory(currentHistoryGoalId, filter);
+            }
+        });
+    });
+}
+
+function calculateCompletionInsights(completions) {
+    if (completions.length === 0) return null;
+    
+    const insights = {
+        totalCompletions: completions.length,
+        averagePerDay: 0,
+        bestDay: null,
+        completionTimes: [],
+        notesCount: 0
+    };
+    
+    // Calculate average completions per day
+    if (completions.length > 1) {
+        const firstCompletion = new Date(Math.min(...completions.map(c => c.completedAt)));
+        const lastCompletion = new Date(Math.max(...completions.map(c => c.completedAt)));
+        const daysDiff = Math.ceil((lastCompletion - firstCompletion) / (1000 * 60 * 60 * 24));
+        insights.averagePerDay = daysDiff > 0 ? (completions.length / daysDiff).toFixed(1) : completions.length;
+    }
+    
+    // Find most active day
+    const dayCounts = {};
+    completions.forEach(completion => {
+        const date = new Date(completion.completedAt).toDateString();
+        dayCounts[date] = (dayCounts[date] || 0) + 1;
+    });
+    
+    const bestDay = Object.entries(dayCounts).reduce((a, b) => dayCounts[a[0]] > dayCounts[b[0]] ? a : b);
+    insights.bestDay = {
+        date: new Date(bestDay[0]).toLocaleDateString(),
+        count: bestDay[1]
+    };
+    
+    // Collect completion times
+    insights.completionTimes = completions.map(c => new Date(c.completedAt).getHours());
+    
+    // Count notes
+    insights.notesCount = completions.filter(c => c.notes && c.notes.trim()).length;
+    
+    return insights;
 }
 
 // UI Helper functions
@@ -1072,6 +1324,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Set up event listeners
     setupEventListeners();
+    
+    // Set up completion history filters
+    setupCompletionHistoryFilters();
     
     // Update online status
     updateOnlineStatus();

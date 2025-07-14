@@ -249,6 +249,82 @@ const options = {
             }
           }
         },
+        GoalCompletion: {
+          type: 'object',
+          required: ['id', 'email', 'goalId', 'childId', 'completedAt', 'completedBy'],
+          properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Unique identifier for the completion event'
+            },
+            email: {
+              type: 'string',
+              format: 'email',
+              description: 'User email address'
+            },
+            goalId: {
+              type: 'string',
+              format: 'uuid',
+              description: 'ID of the goal that was completed'
+            },
+            childId: {
+              type: 'string',
+              format: 'uuid',
+              description: 'ID of the child who completed the goal'
+            },
+            completedAt: {
+              type: 'integer',
+              format: 'int64',
+              description: 'Timestamp when the goal was completed'
+            },
+            completedBy: {
+              type: 'string',
+              enum: ['parent', 'child', 'auto'],
+              description: 'Who completed the goal'
+            },
+            notes: {
+              type: 'string',
+              nullable: true,
+              description: 'Optional notes about the completion'
+            },
+            createdAt: {
+              type: 'integer',
+              format: 'int64',
+              description: 'Timestamp when the completion event was created'
+            }
+          }
+        },
+        GoalStats: {
+          type: 'object',
+          properties: {
+            iterationCount: {
+              type: 'number',
+              description: 'Total number of times this goal has been completed'
+            },
+            currentStreak: {
+              type: 'number',
+              description: 'Current streak of consecutive completions'
+            },
+            longestStreak: {
+              type: 'number',
+              description: 'Longest streak of consecutive completions ever achieved'
+            },
+            lastCompleted: {
+              type: 'integer',
+              format: 'int64',
+              nullable: true,
+              description: 'Timestamp of the most recent completion'
+            },
+            completionHistory: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/GoalCompletion'
+              },
+              description: 'List of all completion events, sorted by most recent first'
+            }
+          }
+        },
         CreateGoalRequest: {
           type: 'object',
           required: ['name', 'type', 'childIds'],

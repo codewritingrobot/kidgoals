@@ -118,7 +118,8 @@ if (!JWT_SECRET) {
 const TABLES = {
   USERS: 'goalaroo-users',
   MAGIC_CODES: 'goalaroo-magic-codes',
-  USER_DATA: 'goalaroo-user-data'
+  USER_DATA: 'goalaroo-user-data',
+  GOAL_COMPLETIONS: 'goalaroo-goal-completions'
 };
 
 // Utility functions
@@ -136,6 +137,121 @@ function verifyJWT(token) {
   } catch (error) {
     return null;
   }
+}
+
+// Completion event utility functions
+async function logGoalCompletion(email, goalId, childId, notes = null, completedBy = 'parent') {
+  const completionEvent = {
+    id: uuidv4(),
+    email: email.toLowerCase(),
+    goalId: goalId,
+    childId: childId,
+    completedAt: Date.now(),
+    completedBy: completedBy,
+    notes: notes,
+    createdAt: Date.now()
+  };
+  
+  await dynamodb.put({
+    TableName: TABLES.GOAL_COMPLETIONS,
+    Item: completionEvent
+  }).promise();
+  
+  return completionEvent;
+}
+
+async function getGoalCompletions(email, goalId, fromTimestamp = null, toTimestamp = null) {
+  const params = {
+    TableName: TABLES.GOAL_COMPLETIONS,
+    KeyConditionExpression: 'email = :email AND goalId = :goalId',
+    ExpressionAttributeValues: {
+      ':email': email.toLowerCase(),
+      ':goalId': goalId
+    }
+  };
+  
+  if (fromTimestamp) {
+    params.FilterExpression = 'completedAt >= :from';
+    params.ExpressionAttributeValues[':from'] = fromTimestamp;
+  }
+  
+  if (toTimestamp) {
+    if (params.FilterExpression) {
+      params.FilterExpression += ' AND completedAt <= :to';
+    } else {
+      params.FilterExpression = 'completedAt <= :to';
+    }
+    params.ExpressionAttributeValues[':to'] = toTimestamp;
+  }
+  
+  const result = await dynamodb.query(params).promise();
+  return result.Items || [];
+}
+
+function calculateStreak(completions, goalType) {
+  if (!completions || completions.length === 0) return 0;
+  
+  const sorted = completions.sort((a, b) => b.completedAt - a.completedAt);
+  let streak = 0;
+  let currentDate = new Date();
+  
+  for (let completion of sorted) {
+    const completionDate = new Date(completion.completedAt);
+    const daysDiff = Math.floor((currentDate - completionDate) / (1000 * 60 * 60 * 24));
+    
+    if (goalType === 'daily' && daysDiff <= 1) {
+      streak++;
+      currentDate = completionDate;
+    } else if (goalType === 'weekly' && daysDiff <= 7) {
+      streak++;
+      currentDate = completionDate;
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
+function calculateLongestStreak(completions, goalType) {
+  if (!completions || completions.length === 0) return 0;
+  
+  const sorted = completions.sort((a, b) => a.completedAt - b.completedAt);
+  let currentStreak = 1;
+  let longestStreak = 1;
+  
+  for (let i = 1; i < sorted.length; i++) {
+    const prevDate = new Date(sorted[i-1].completedAt);
+    const currDate = new Date(sorted[i].completedAt);
+    const daysDiff = Math.floor((currDate - prevDate) / (1000 * 60 * 60 * 24));
+    
+    if (goalType === 'daily' && daysDiff <= 1) {
+      currentStreak++;
+    } else if (goalType === 'weekly' && daysDiff <= 7) {
+      currentStreak++;
+    } else {
+      currentStreak = 1;
+    }
+    
+    longestStreak = Math.max(longestStreak, currentStreak);
+  }
+  
+  return longestStreak;
+}
+
+async function getGoalStats(email, goalId, goalType) {
+  const completions = await getGoalCompletions(email, goalId);
+  const currentStreak = calculateStreak(completions, goalType);
+  const longestStreak = calculateLongestStreak(completions, goalType);
+  const iterationCount = completions.length;
+  
+  return {
+    iterationCount,
+    currentStreak,
+    longestStreak,
+    lastCompleted: completions.length > 0 ? Math.max(...completions.map(c => c.completedAt)) : null,
+    completionHistory: completions.sort((a, b) => b.completedAt - a.completedAt)
+  };
 }
 
 // Authentication middleware
@@ -1053,6 +1169,266 @@ app.put('/api/goals/:id', authenticateToken, async (req, res) => {
     res.json(userData.goals[goalIndex]);
   } catch (error) {
     console.error('Error updating goal:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/goals/{id}/complete:
+ *   post:
+ *     summary: Log a goal completion
+ *     description: Logs a completion event for a goal and returns updated stats
+ *     tags: [Goals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Goal ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               notes:
+ *                 type: string
+ *                 description: Optional notes about the completion
+ *               completedBy:
+ *                 type: string
+ *                 enum: [parent, child, auto]
+ *                 default: parent
+ *                 description: Who completed the goal
+ *     responses:
+ *       200:
+ *         description: Goal completion logged successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 completionEvent:
+ *                   $ref: '#/components/schemas/GoalCompletion'
+ *                 stats:
+ *                   $ref: '#/components/schemas/GoalStats'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Goal not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post('/api/goals/:id/complete', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const { id } = req.params;
+    const { notes, completedBy = 'parent' } = req.body;
+    
+    // Get current data to verify goal exists and get its type
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const userData = result.Item || { children: [], goals: [] };
+    const goal = userData.goals.find(g => g.id === id);
+    
+    if (!goal) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    // Log the completion event
+    const completionEvent = await logGoalCompletion(email, id, goal.childId, notes, completedBy);
+    
+    // Get updated stats
+    const stats = await getGoalStats(email, id, goal.type);
+    
+    res.json({
+      completionEvent,
+      stats
+    });
+  } catch (error) {
+    console.error('Error logging goal completion:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/goals/{id}/completions:
+ *   get:
+ *     summary: Get goal completion history
+ *     description: Retrieves all completion events for a specific goal
+ *     tags: [Goals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Goal ID
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: integer
+ *           format: int64
+ *         description: Filter completions from this timestamp
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: integer
+ *           format: int64
+ *         description: Filter completions to this timestamp
+ *     responses:
+ *       200:
+ *         description: Completion history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/GoalCompletion'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Goal not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get('/api/goals/:id/completions', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const { id } = req.params;
+    const { from, to } = req.query;
+    
+    // Verify goal exists
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const userData = result.Item || { children: [], goals: [] };
+    const goal = userData.goals.find(g => g.id === id);
+    
+    if (!goal) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    // Get completion history
+    const completions = await getGoalCompletions(
+      email, 
+      id, 
+      from ? parseInt(from) : null, 
+      to ? parseInt(to) : null
+    );
+    
+    res.json(completions);
+  } catch (error) {
+    console.error('Error getting goal completions:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/goals/{id}/stats:
+ *   get:
+ *     summary: Get goal statistics
+ *     description: Retrieves calculated statistics for a goal including iteration count, streaks, and completion history
+ *     tags: [Goals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Goal ID
+ *     responses:
+ *       200:
+ *         description: Goal statistics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GoalStats'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Goal not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get('/api/goals/:id/stats', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const { id } = req.params;
+    
+    // Verify goal exists and get its type
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const userData = result.Item || { children: [], goals: [] };
+    const goal = userData.goals.find(g => g.id === id);
+    
+    if (!goal) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    // Get calculated stats
+    const stats = await getGoalStats(email, id, goal.type);
+    
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting goal stats:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
