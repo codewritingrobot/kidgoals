@@ -1,20 +1,18 @@
-# Goalaroo - Progressive Web App
+# Goalaroo - Child Goal Tracking PWA
 
-A beautiful, child-friendly Progressive Web App designed to help parents track their children's behavioral goals through visual progress tracking. Features emoji-based feedback, star ratings, and colorful progress indicators.
+A beautiful, child-friendly Progressive Web App designed to help parents track their children's behavioral goals through visual progress tracking. Features emoji-based feedback, story-based progress trails, and colorful goal management with a modern API-based architecture.
 
 ## Features
 
 ### 🎯 Core Functionality
-- **Magic Link Authentication** - Secure email-based login without passwords
+- **JWT Authentication** - Secure email-based login with magic codes
 - **Session Persistence** - Stay logged in across page refreshes for 7 days
 - **Multi-Child Support** - Track goals for multiple children with unique color coding
 - **Story-Based Goals** - Engaging narratives with characters and visual trails
-- **Goal Types** - Adventure Quests (countdown) and Collection Quests (countup)
-- **Flexible Timeframes** - Set goals in hours, days, or weeks
-- **Tracking Periods** - Continuous, daily, or weekly goal resets
+- **Goal Types** - Timer goals (countdown/countup), Countdown goals, and Count Up goals
 - **Visual Trail Progress** - Winding paths with milestone markers and character movement
-- **Milestone Celebrations** - Instant feedback with animations and sounds
 - **Real-time Updates** - Live progress tracking with smooth animations
+- **API-Based Architecture** - Modern backend with RESTful API endpoints
 
 ### 🎨 User Experience
 - **Child-Friendly Interface** - Large buttons, simple language, emoji-based communication
@@ -24,18 +22,19 @@ A beautiful, child-friendly Progressive Web App designed to help parents track t
 - **Celebration Animations** - Fun rewards when goals are completed
 
 ### 🔧 Goal Management
-- **Pause/Resume** - Temporarily stop and restart goal tracking
-- **Reset Goals** - Start over when needed
+- **Create/Edit Goals** - Add new goals and modify existing ones
 - **Delete Goals** - Remove completed or outdated goals
-- **Confirmation Dialogs** - Prevent accidental data loss
+- **Goal Status Tracking** - Monitor active, paused, completed, and waiting goals
+- **Multi-Child Goals** - Assign goals to multiple children
 
 ## Quick Start
 
-### Local Development (Client-Only)
+### Local Development
 
 #### Prerequisites
+- Node.js (for backend development)
 - A modern web browser (Chrome, Firefox, Safari, Edge)
-- Python 3.x (for local development server)
+- Python 3.x (for frontend development server)
 
 #### Installation
 
@@ -45,27 +44,32 @@ A beautiful, child-friendly Progressive Web App designed to help parents track t
    cd KidGoals
    ```
 
-2. **Start a local development server**
+2. **Set up the backend**
    ```bash
-   # Using Python 3
-   python -m http.server 8000
-   
-   # Or using Python 2
-   python -m SimpleHTTPServer 8000
+   cd backend
+   npm install
+   cp env.example .env
+   # Edit .env with your configuration
+   npm start
    ```
 
-3. **Open the application**
+3. **Start the frontend development server**
+   ```bash
+   # In the root directory
+   python -m http.server 8000
+   ```
+
+4. **Open the application**
    - Navigate to `http://localhost:8000` in your browser
-   - For PWA features, use `https://localhost:8000` (requires HTTPS)
+   - The frontend will connect to the backend at `http://localhost:3000`
 
-### Production Deployment (Server + Client)
+### Production Deployment
 
-For production deployment with server-side state management, see [DEPLOYMENT.md](DEPLOYMENT.md) for complete instructions.
+For production deployment with AWS infrastructure, see [DEPLOYMENT.md](DEPLOYMENT.md) for complete instructions.
 
-**Features of server deployment:**
+**Features of production deployment:**
 - Cross-browser and multi-device data synchronization
 - Real email authentication with magic codes
-- Offline-first with automatic sync
 - Scalable AWS infrastructure
 - Production-ready security and monitoring
 
@@ -110,50 +114,56 @@ For production deployment with server-side state management, see [DEPLOYMENT.md]
 
 ### Goal Types Explained
 
-#### Adventure Quests (Countdown Goals)
+#### Timer Goals
 - **Story**: Fiona the Fox needs to get home before sunset
-- **Purpose**: Track when your child avoids negative behaviors
-- **Example**: "No hitting for 24 hours"
+- **Purpose**: Track time-based activities with countdown or countup timers
+- **Example**: "Practice piano for 30 minutes"
 - **Progress**: Fox moves along a forest trail, leaving paw prints at milestones
 - **Success**: Fox reaches home safely when the time period is completed
 
-#### Collection Quests (Countup Goals)
+#### Countdown Goals
+- **Story**: Fiona the Fox needs to get home before sunset
+- **Purpose**: Track when your child avoids negative behaviors
+- **Example**: "No hitting for 10 times"
+- **Progress**: Fox moves along a forest trail, leaving paw prints at milestones
+- **Success**: Fox reaches home safely when the countdown reaches zero
+
+#### Count Up Goals
 - **Story**: Ruby the Rabbit collects magical gems to unlock treasures
 - **Purpose**: Track positive behaviors your child achieves
-- **Example**: "Practice piano for 30 minutes"
+- **Example**: "Read 5 books"
 - **Progress**: Rabbit hops along collecting gems at milestone intervals
-- **Success**: Rabbit unlocks the treasure chest when the target time is reached
-
-### Tracking Periods
-
-- **Continuous**: Goal runs until manually reset or completed
-- **Daily**: Goal resets every day at midnight
-- **Weekly**: Goal resets every week on the same day
+- **Success**: Rabbit unlocks the treasure chest when the target is reached
 
 ### Managing Goals
 
 - **View Progress**: Tap any goal card to see the story trail and character progress
-- **Milestone Celebrations**: Automatic animations and sounds when milestones are reached
-- **Pause/Resume**: Temporarily stop goal tracking (useful for breaks)
-- **Reset**: Start the goal over from the beginning
-- **Delete**: Remove the goal permanently
+- **Edit Goals**: Modify goal names, colors, and assignments
+- **Delete Goals**: Remove goals permanently
+- **Multi-Child Assignment**: Assign goals to multiple children
 
 ## Technical Details
 
 ### Architecture
 - **Frontend**: Vanilla HTML5, CSS3, JavaScript (ES6+)
-- **Storage**: Local Storage for data persistence
+- **Backend**: Node.js/Express with RESTful API
+- **Database**: DynamoDB for data persistence
+- **Authentication**: JWT with magic code email verification
 - **PWA**: Service Worker for offline functionality
-- **No Dependencies**: Pure web technologies only
 
 ### File Structure
 ```
 KidGoals/
 ├── index.html          # Main application file
 ├── styles.css          # All CSS styles
-├── app.js             # Application logic
+├── app.js             # Frontend application logic
 ├── manifest.json      # PWA manifest
 ├── sw.js             # Service Worker
+├── backend/           # Backend API server
+│   ├── server.js      # Express server
+│   ├── swagger.js     # API documentation
+│   └── package.json   # Backend dependencies
+├── terraform/         # Infrastructure as Code
 └── README.md         # This file
 ```
 

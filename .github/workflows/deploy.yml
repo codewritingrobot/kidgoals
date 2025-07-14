@@ -178,7 +178,7 @@ jobs:
                 },
                 {
                   "name": "API_URL",
-                  "value": "https://api.mcsoko.com"
+                  "value": "https://api.goalaroo.mcsoko.com"
                 }
               ],
               "secrets": [
@@ -378,7 +378,7 @@ jobs:
           echo "✅ Full deployment completed successfully!"
           echo "🔧 Backend: Updated and deployed"
           echo "🌐 Frontend: Updated and deployed"
-          echo "🚀 API URL: https://api.mcsoko.com"
+          echo "🚀 API URL: https://api.goalaroo.mcsoko.com"
           echo "🌐 Frontend URL: https://goalaroo.mcsoko.com"
           echo "🐳 ECR Repository: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
           echo "📦 Image Tag: ${{ github.sha }}"
@@ -387,5 +387,5 @@ jobs:
           echo "📱 Frontend: Updated and deployed"
           echo "🔧 Backend: No changes - skipped rebuild"
           echo "🌐 Frontend URL: https://goalaroo.mcsoko.com"
-          echo "🚀 API URL: https://api.mcsoko.com (unchanged)"
+          echo "🚀 API URL: https://api.goalaroo.mcsoko.com (unchanged)"
         fi 

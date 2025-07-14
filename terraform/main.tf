@@ -382,7 +382,7 @@ resource "aws_lb_listener" "app" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
-  certificate_arn   = aws_acm_certificate.api.arn
+  certificate_arn   = aws_acm_certificate_validation.api.certificate_arn
 
   default_action {
     type             = "forward"
@@ -549,7 +549,7 @@ data "aws_route53_zone" "main" {
 }
 
 resource "aws_acm_certificate" "api" {
-  domain_name       = "api.${var.domain_name}"
+  domain_name       = "api.goalaroo.${var.domain_name}"
   validation_method = "DNS"
 
   tags = {
@@ -628,7 +628,7 @@ resource "aws_acm_certificate_validation" "frontend" {
 
 resource "aws_route53_record" "api" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = "api.${var.domain_name}"
+  name    = "api.goalaroo.${var.domain_name}"
   type    = "A"
 
   alias {
@@ -788,7 +788,7 @@ output "alb_dns_name" {
 
 output "api_url" {
   description = "The URL of the API"
-  value       = "https://api.${var.domain_name}"
+  value       = "https://api.goalaroo.${var.domain_name}"
 }
 
 output "frontend_url" {

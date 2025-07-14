@@ -5,6 +5,10 @@ project_name = "goalaroo"
 domain_name = "mcsoko.com"
 environment = "production"
 
+# This will create:
+# - API: https://api.goalaroo.mcsoko.com
+# - Frontend: https://goalaroo.mcsoko.com
+
 # Generate a secure JWT secret (you can use: openssl rand -base64 32)
 jwt_secret = "your-super-secure-jwt-secret-here-change-this"
 

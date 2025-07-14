@@ -236,13 +236,13 @@ terraform apply
 
 ### Health Check
 ```bash
-curl https://api.mcsoko.com/api/health
+curl https://api.goalaroo.mcsoko.com/api/health
 ```
 
 ### Authentication Test
 ```bash
 # Send magic code
-curl -X POST https://api.mcsoko.com/api/auth/send-code \
+curl -X POST https://api.goalaroo.mcsoko.com/api/auth/send-code \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com"}'
 ```

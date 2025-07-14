@@ -1,7 +1,7 @@
 // KidGoals PWA - Clean Client-Server API Interface
 
 // Version information - dynamically generated from Git
-const APP_VERSION = window.GIT_VERSION ? window.GIT_VERSION.version : '2.0.0';
+const APP_VERSION = window.APP_VERSION ? window.APP_VERSION.version : '2.0.0';
 
 // Constants
 const COLORS = [
@@ -17,7 +17,7 @@ const ICONS = [
 ];
 
 // API Configuration
-const API_BASE_URL = 'https://api.mcsoko.com';
+const API_BASE_URL = 'https://api.goalaroo.mcsoko.com';
 const API_ENDPOINTS = {
     SEND_CODE: '/api/auth/send-code',
     VERIFY_CODE: '/api/auth/verify-code',
@@ -47,24 +47,7 @@ const STORY_THEMES = {
         trailItemName: "gem",
         story: "is collecting magical gems to unlock the treasure chest. Each gem brings her closer to discovering amazing treasures!"
     },
-    daily: {
-        character: "🦘",
-        characterName: "Kangaroo Kid",
-        destination: "⭐",
-        destinationName: "star",
-        trailItem: "🌟",
-        trailItemName: "star",
-        story: "is hopping through the day to collect stars. Each star represents a successful day of achieving their goal!"
-    },
-    weekly: {
-        character: "🐨",
-        characterName: "Koala Kid",
-        destination: "🏆",
-        destinationName: "trophy",
-        trailItem: "🏅",
-        trailItemName: "medal",
-        story: "is climbing the tree of success to reach the trophy. Each medal represents a week of consistent progress!"
-    },
+
     timer: {
         character: "🦊",
         characterName: "Fiona the Fox",
@@ -113,10 +96,10 @@ function registerServiceWorker() {
                 navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
                 
                 // Send cache version to service worker
-                if (window.GIT_VERSION && window.GIT_VERSION.cacheVersion) {
+                if (window.APP_VERSION && window.APP_VERSION.version) {
                     registration.active.postMessage({
                         type: 'SET_CACHE_VERSION',
-                        cacheVersion: window.GIT_VERSION.cacheVersion
+                        cacheVersion: window.APP_VERSION.version
                     });
                 }
             })
@@ -807,9 +790,7 @@ function calculateProgress(goal) {
         case 'timer':
             const elapsed = Date.now() - goal.startTime;
             return Math.min(100, (elapsed / goal.totalDuration) * 100);
-        case 'daily':
-        case 'weekly':
-            return goal.progress || 0;
+
         default:
             return goal.progress || 0;
     }
@@ -1049,9 +1030,7 @@ function setupEventListeners() {
                 name: formData.get('name').trim(),
                 type: formData.get('type'),
                 color: formData.get('color'),
-                childIds: Array.from(formData.getAll('children')),
-                repeat: formData.get('repeat') === 'on',
-                repeatSchedule: formData.get('repeatSchedule') || null
+                childIds: Array.from(formData.getAll('children'))
             };
             
             // Add type-specific data
