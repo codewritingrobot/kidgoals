@@ -815,6 +815,7 @@ function createGoalCard(goal, goalGroup = [goal]) {
                 <button onclick="openGoalDetail('${goal.id}')" class="btn-icon">👁️</button>
                 <button onclick="editGoal('${goal.id}')" class="btn-icon">✏️</button>
                 <button onclick="deleteGoal('${goal.id}')" class="btn-icon">🗑️</button>
+                ${goal.status !== 'completed' ? `<button onclick="completeGoal('${goal.id}')" class="btn-icon" style="background: #34C759; color: white;">✅</button>` : `<button onclick="resetGoal('${goal.id}')" class="btn-icon" style="background: #FF9500; color: white;">🔄</button>`}
             </div>
         </div>
         <div class="goal-progress">
@@ -829,6 +830,8 @@ function createGoalCard(goal, goalGroup = [goal]) {
         <div class="goal-status">
             <span class="status-badge ${goal.status}">${goal.status}</span>
             ${goal.type === 'timer' ? `<span class="timer-info">${formatTimeRemaining(goal.totalDuration - (Date.now() - goal.startTime))}</span>` : ''}
+            ${goal.iterationCount > 0 ? `<span class="iteration-info">🏆 ${goal.iterationCount} completions</span>` : ''}
+            ${goal.streak > 0 ? `<span class="streak-info">🔥 ${goal.streak} streak</span>` : ''}
         </div>
     `;
     
@@ -1000,6 +1003,42 @@ async function deleteGoal(goalId) {
         showSuccess('Goal deleted successfully!');
     } catch (error) {
         showError(error.message || 'Failed to delete goal');
+        throw error;
+    }
+}
+
+async function completeGoal(goalId) {
+    try {
+        const updatedGoal = await apiCall(`${API_ENDPOINTS.GOALS}/${goalId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'completed' })
+        });
+        
+        await loadGoals();
+        renderGoals();
+        showSuccess(`Goal completed! Iterations: ${updatedGoal.iterationCount}, Streak: ${updatedGoal.streak}`);
+    } catch (error) {
+        showError(error.message || 'Failed to complete goal');
+        throw error;
+    }
+}
+
+async function resetGoal(goalId) {
+    try {
+        const updatedGoal = await apiCall(`${API_ENDPOINTS.GOALS}/${goalId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ 
+                status: 'active',
+                current: 0,
+                progress: 0
+            })
+        });
+        
+        await loadGoals();
+        renderGoals();
+        showSuccess('Goal reset successfully!');
+    } catch (error) {
+        showError(error.message || 'Failed to reset goal');
         throw error;
     }
 }
