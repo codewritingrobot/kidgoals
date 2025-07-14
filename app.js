@@ -599,22 +599,40 @@ function openEditChildModal(child) {
     const modal = document.getElementById('edit-child-modal');
     const form = modal.querySelector('form');
     
+    // Set the name field
     form.querySelector('#edit-child-name').value = child.name;
-    form.querySelector('#edit-child-avatar').value = child.avatar;
-    form.querySelector('#edit-child-color').value = child.color;
+    
+    // Initialize and set the avatar picker
+    initializeAvatarPicker('edit-child-avatar', child.avatar);
+    
+    // Initialize and set the color picker
+    initializeColorPicker('edit-child-color', child.color);
     
     // Set up form submission
     form.onsubmit = async function(e) {
         e.preventDefault();
         
+        const avatarContainer = document.getElementById('edit-child-avatar');
+        const colorContainer = document.getElementById('edit-child-color');
+        
         const updatedChild = {
             name: form.querySelector('#edit-child-name').value.trim(),
-            avatar: form.querySelector('#edit-child-avatar').value,
-            color: form.querySelector('#edit-child-color').value
+            avatar: avatarContainer.dataset.selectedAvatar || child.avatar,
+            color: colorContainer.dataset.selectedColor || child.color
         };
         
         if (!updatedChild.name) {
             showError('Please enter a name');
+            return;
+        }
+        
+        if (!updatedChild.avatar) {
+            showError('Please select an avatar');
+            return;
+        }
+        
+        if (!updatedChild.color) {
+            showError('Please select a color');
             return;
         }
         
@@ -800,7 +818,7 @@ function calculateProgress(goal) {
 function showModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
-        modal.style.display = 'flex';
+        modal.classList.add('active');
         attachModalEventListeners(modalId);
     }
 }
@@ -808,7 +826,7 @@ function showModal(modalId) {
 function hideModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
-        modal.style.display = 'none';
+        modal.classList.remove('active');
     }
 }
 
@@ -999,10 +1017,13 @@ function setupEventListeners() {
             e.preventDefault();
             
             const formData = new FormData(addChildForm);
+            const avatarContainer = document.getElementById('add-child-avatar');
+            const colorContainer = document.getElementById('add-child-color');
+            
             const childData = {
                 name: formData.get('name').trim(),
-                avatar: formData.get('avatar'),
-                color: formData.get('color')
+                avatar: avatarContainer.dataset.selectedAvatar || '🦊',
+                color: colorContainer.dataset.selectedColor || '#007AFF'
             };
             
             if (!childData.name) {
@@ -1010,9 +1031,24 @@ function setupEventListeners() {
                 return;
             }
             
+            if (!childData.avatar) {
+                showError('Please select an avatar');
+                return;
+            }
+            
+            if (!childData.color) {
+                showError('Please select a color');
+                return;
+            }
+            
             try {
                 await createChild(childData);
                 addChildForm.reset();
+                // Reset the pickers
+                avatarContainer.dataset.selectedAvatar = '';
+                colorContainer.dataset.selectedColor = '';
+                avatarContainer.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
+                colorContainer.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
             } catch (error) {
                 console.error('Failed to create child:', error);
             }
@@ -1108,11 +1144,11 @@ function initializeAvatarPicker(containerId, defaultAvatar) {
     container.innerHTML = '';
     ICONS.forEach(icon => {
         const iconOption = document.createElement('div');
-        iconOption.className = 'avatar-option';
+        iconOption.className = 'icon-option';
         iconOption.textContent = icon;
         iconOption.dataset.avatar = icon;
         iconOption.onclick = () => {
-            container.querySelectorAll('.avatar-option').forEach(opt => opt.classList.remove('selected'));
+            container.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
             iconOption.classList.add('selected');
             container.dataset.selectedAvatar = icon;
         };
