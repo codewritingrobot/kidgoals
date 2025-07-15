@@ -1571,17 +1571,13 @@ function openGoalDetail(goalId) {
     if (!goal) return;
     
     const modal = document.getElementById('goal-detail-modal');
-    const content = modal.querySelector('.modal-content');
+    const modalBody = modal.querySelector('.modal-body');
     
     const progress = calculateProgress(goal);
     const milestones = calculateMilestones(goal);
     const goalChildren = getGoalChildren(goal);
     
-    content.innerHTML = `
-        <div class="goal-detail-header">
-            <h2>${goal.name}</h2>
-            <button onclick="hideModal('goal-detail-modal')" class="btn-close">×</button>
-        </div>
+    modalBody.innerHTML = `
         <div class="goal-detail-content">
             <div class="goal-info-section">
                 <h3>Goal Information</h3>
@@ -1611,16 +1607,20 @@ function editGoal(goalId) {
     // Populate edit form
     const form = document.getElementById('edit-goal-form');
     form.querySelector('#edit-goal-name').value = goal.name;
-    form.querySelector('#edit-goal-type').value = goal.type;
-    form.querySelector('#edit-goal-color').value = goal.color;
+    
+    // Initialize color picker with current goal color
+    initializeColorPicker('edit-goal-color', goal.color);
     
     // Set up form submission
     form.onsubmit = async function(e) {
         e.preventDefault();
         
+        const colorPicker = document.getElementById('edit-goal-color');
+        const selectedColor = colorPicker.dataset.selectedColor || COLORS[0];
+        
         const updates = {
             name: form.querySelector('#edit-goal-name').value.trim(),
-            color: form.querySelector('#edit-goal-color').value
+            color: selectedColor
         };
         
         try {
@@ -1673,5 +1673,12 @@ function showAddGoalModal() {
         });
         document.querySelector('#add-goal-form button[type="submit"]').disabled = false;
     }
+    
+    // Trigger goal type change handler to show appropriate form elements
+    const goalTypeSelect = document.getElementById('goal-type');
+    if (goalTypeSelect) {
+        goalTypeSelect.dispatchEvent(new Event('change'));
+    }
+    
     showModal('add-goal-modal');
 }
