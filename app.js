@@ -23,6 +23,7 @@ const API_BASE_URL = window.location.hostname === 'localhost' || window.location
 const API_ENDPOINTS = {
     SEND_CODE: '/api/auth/send-code',
     VERIFY_CODE: '/api/auth/verify-code',
+    BYPASS_AUTH: '/api/auth/bypass',
     CHILDREN: '/api/children',
     GOALS: '/api/goals',
     USER_DATA: '/api/user/data',
@@ -501,6 +502,27 @@ function saveSelectedChild(childId) {
 
 function loadSelectedChild() {
     return localStorage.getItem(SELECTED_CHILD_KEY);
+}
+
+// Auth bypass function
+async function tryBypassAuth() {
+    try {
+        const response = await apiCall(API_ENDPOINTS.BYPASS_AUTH, {
+            method: 'POST'
+        });
+        
+        if (response.bypass) {
+            console.log('🚀 Authentication bypassed successfully');
+            saveSession(response.user, response.token);
+            showDashboard();
+            await loadAllData();
+            return true;
+        }
+    } catch (error) {
+        console.log('Auth bypass not available:', error.message);
+        return false;
+    }
+    return false;
 }
 
 // Authentication functions
@@ -1388,7 +1410,7 @@ function showError(message) {
 }
 
 // Initialize app
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('KidGoals app initializing...');
     
     // Register service worker
@@ -1400,7 +1422,11 @@ document.addEventListener('DOMContentLoaded', function() {
         showDashboard();
         loadUserData();
     } else {
-        showAuthScreen();
+        // Try auth bypass first, if not available show auth screen
+        const bypassed = await tryBypassAuth();
+        if (!bypassed) {
+            showAuthScreen();
+        }
     }
     
     // Set up event listeners

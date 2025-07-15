@@ -52,8 +52,8 @@ variable "jwt_secret" {
   sensitive   = true
 }
 
-variable "development_mode" {
-  description = "Enable development mode (bypasses email sending and shows magic codes)"
+variable "bypass_auth" {
+  description = "Bypass authentication and use default user for development"
   type        = string
   default     = "false"
 } 

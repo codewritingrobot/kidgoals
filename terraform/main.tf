@@ -278,8 +278,8 @@ resource "aws_ecs_task_definition" "app" {
           value = var.environment
         },
         {
-          name  = "DEVELOPMENT_MODE"
-          value = var.development_mode
+          name  = "BYPASS_AUTH"
+          value = var.bypass_auth
         },
         {
           name  = "AWS_REGION"

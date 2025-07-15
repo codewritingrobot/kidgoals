@@ -15,8 +15,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// AWS Configuration
-const isDevelopment = process.env.NODE_ENV === 'development' || process.env.DEVELOPMENT_MODE === 'true';
+// Configuration
+const isDevelopment = process.env.NODE_ENV === 'development';
+const bypassAuth = process.env.BYPASS_AUTH === 'true';
 
 AWS.config.update({
   region: process.env.AWS_REGION || 'us-east-1',
@@ -382,10 +383,10 @@ app.post('/api/auth/send-code', async (req, res) => {
       }
     }).promise();
     
-    // Check if we're in development mode
-    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.DEVELOPMENT_MODE === 'true';
+    // Check if we're bypassing auth or in development mode
+    const shouldBypassEmail = bypassAuth || isDevelopment;
     
-    if (isDevelopment) {
+    if (shouldBypassEmail) {
       // In development mode, skip email sending and return the code
       console.log(`🔑 Development Mode - Magic code for ${email}: ${code}`);
       res.json({ 
@@ -513,6 +514,100 @@ app.post('/api/auth/verify-code', async (req, res) => {
     });
   } catch (error) {
     console.error('Error verifying code:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/bypass:
+ *   post:
+ *     summary: Bypass authentication for development
+ *     description: Returns a JWT token for a default user when BYPASS_AUTH is enabled
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Authentication bypassed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       403:
+ *         description: Auth bypass not enabled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post('/api/auth/bypass', async (req, res) => {
+  try {
+    if (!bypassAuth) {
+      return res.status(403).json({ error: 'Auth bypass not enabled' });
+    }
+    
+    const defaultEmail = 'dev-user@goalaroo.dev';
+    console.log(`🚀 Auth Bypass - Using default user: ${defaultEmail}`);
+    
+    // Generate JWT token for default user
+    const token = generateJWT(defaultEmail);
+    
+    // Ensure default user exists in database
+    const userResult = await dynamodb.get({
+      TableName: TABLES.USERS,
+      Key: { email: defaultEmail }
+    }).promise();
+    
+    if (!userResult.Item) {
+      // Create default user
+      await dynamodb.put({
+        TableName: TABLES.USERS,
+        Item: {
+          email: defaultEmail,
+          createdAt: Date.now(),
+          lastLogin: Date.now()
+        }
+      }).promise();
+      
+      // Initialize user data with sample data
+      await dynamodb.put({
+        TableName: TABLES.USER_DATA,
+        Item: {
+          email: defaultEmail,
+          children: [
+            {
+              id: 'child-1',
+              name: 'Test Child',
+              avatar: '🦘',
+              color: '#007AFF',
+              createdAt: Date.now()
+            }
+          ],
+          goals: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      }).promise();
+      
+      console.log(`✅ Created default user and sample data for ${defaultEmail}`);
+    } else {
+      // Update last login
+      await dynamodb.update({
+        TableName: TABLES.USERS,
+        Key: { email: defaultEmail },
+        UpdateExpression: 'SET lastLogin = :lastLogin',
+        ExpressionAttributeValues: {
+          ':lastLogin': Date.now()
+        }
+      }).promise();
+    }
+    
+    res.json({
+      token,
+      user: { email: defaultEmail },
+      bypass: true
+    });
+  } catch (error) {
+    console.error('Error bypassing auth:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
