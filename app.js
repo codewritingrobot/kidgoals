@@ -640,6 +640,12 @@ function showAuthScreen() {
 function showDashboard() {
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
+    
+    // Set user email in header
+    const userEmailElement = document.getElementById('user-email');
+    if (userEmailElement && currentUser && currentUser.email) {
+        userEmailElement.textContent = currentUser.email;
+    }
 }
 
 async function selectChild(childId) {
