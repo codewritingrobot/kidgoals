@@ -616,26 +616,37 @@ function renderChildAvatars() {
     container.innerHTML = '';
     
     children.forEach(child => {
-        const avatar = document.createElement('div');
-        avatar.className = `child-avatar ${selectedChildId === child.id ? 'selected' : ''}`;
-        avatar.style.backgroundColor = child.color;
-        avatar.innerHTML = `
-            <div class="avatar-icon">${child.avatar}</div>
-            <div class="child-name">${child.name}</div>
+        const avatarContainer = document.createElement('div');
+        avatarContainer.className = 'child-avatar-container';
+        avatarContainer.onclick = () => selectChild(child.id);
+        
+        avatarContainer.innerHTML = `
+            <div class="child-avatar-emoji ${selectedChildId === child.id ? 'selected' : ''}" 
+                 style="background: ${child.color}">
+                ${child.avatar}
+            </div>
+            <div class="child-avatar-name">${child.name}</div>
+            <button class="child-avatar-edit-btn" onclick="openEditChildModal(${JSON.stringify(child).replace(/"/g, '&quot;')})">
+                ✏️
+            </button>
         `;
-        avatar.onclick = () => selectChild(child.id);
-        container.appendChild(avatar);
+        
+        container.appendChild(avatarContainer);
     });
     
-    // Add child button
-    const addButton = document.createElement('div');
-    addButton.className = 'child-avatar add-child';
-    addButton.innerHTML = `
-        <div class="avatar-icon">➕</div>
-        <div class="child-name">Add Child</div>
+    // Add "Add Child" button
+    const addChildContainer = document.createElement('div');
+    addChildContainer.className = 'child-avatar-container add-child-container';
+    addChildContainer.onclick = () => showModal('add-child-modal');
+    
+    addChildContainer.innerHTML = `
+        <div class="child-avatar-emoji add-child-emoji">
+            <span>➕</span>
+        </div>
+        <div class="child-avatar-name">Add Child</div>
     `;
-    addButton.onclick = () => showModal('add-child-modal');
-    container.appendChild(addButton);
+    
+    container.appendChild(addChildContainer);
 }
 
 function openEditChildModal(child) {
