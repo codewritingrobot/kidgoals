@@ -252,13 +252,17 @@ async function loadGoals() {
 }
 
 async function loadAllData() {
+    console.log('Loading all data (children and goals)...');
     try {
-        await Promise.all([loadChildren(), loadGoals()]);
-        renderChildAvatars();
-        await renderGoals();
+        // Load children and goals in parallel
+        const [childrenResult, goalsResult] = await Promise.all([loadChildren(), loadGoals()]);
+        console.log(`Loaded ${children.length} children and ${goals.length} goals from API`);
+        
+        return { children: childrenResult, goals: goalsResult };
     } catch (error) {
         console.error('Failed to load data:', error);
-        showError('Failed to load data. Please try again.');
+        // Re-throw the error so calling functions can handle it appropriately
+        throw error;
     }
 }
 
@@ -600,22 +604,43 @@ function logout() {
 
 async function loadUserData() {
     if (!authToken) {
+        console.log('No auth token available, showing auth screen');
         showAuthScreen();
         return;
     }
     
+    console.log('Loading user data with auth token...');
+    
     try {
+        // Load all data (children and goals)
         await loadAllData();
+        
+        // Set up selected child
         selectedChildId = loadSelectedChild();
         if (children.length > 0 && !selectedChildId) {
             selectedChildId = children[0].id;
             saveSelectedChild(selectedChildId);
         }
+        
+        console.log(`Loaded ${children.length} children and ${goals.length} goals`);
+        
+        // Render the UI
+        renderChildAvatars();
+        await renderGoals();
+        
     } catch (error) {
         console.error('Failed to load user data:', error);
+        
+        // Check if it's an authentication error
         if (error.message.includes('401') || error.message.includes('403')) {
+            console.log('Authentication error, clearing session');
             clearSession();
             showAuthScreen();
+            throw error;
+        } else {
+            // Other errors - could be network issues
+            console.error('Network or other error loading data:', error);
+            throw error;
         }
     }
 }
@@ -1518,20 +1543,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Register service worker
     registerServiceWorker();
     
-    // Check for existing session
-    const session = loadSession();
-    if (session) {
-        showDashboard();
-        loadUserData();
-    } else {
-        // Try auth bypass first, if not available show auth screen
-        const bypassed = await tryBypassAuth();
-        if (!bypassed) {
-            showAuthScreen();
-        }
-    }
-    
-    // Set up event listeners
+    // Set up event listeners first
     setupEventListeners();
     
     // Set up completion history filters
@@ -1539,6 +1551,56 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Update online status
     updateOnlineStatus();
+    
+    // Check for existing session and properly await data loading
+    const session = loadSession();
+    if (session) {
+        console.log('Found existing session, loading dashboard...');
+        showDashboard();
+        
+        // Show loading state
+        const goalsContainer = document.getElementById('goals-container');
+        if (goalsContainer) {
+            goalsContainer.innerHTML = `
+                <div class="loading-state">
+                    <div class="loading-spinner">
+                        <div class="spinner-ring"></div>
+                        <div class="spinner-ring"></div>
+                        <div class="spinner-ring"></div>
+                    </div>
+                    <div class="loading-text">Loading your goals...</div>
+                </div>
+            `;
+        }
+        
+        try {
+            await loadUserData();
+            console.log('User data loaded successfully');
+        } catch (error) {
+            console.error('Failed to load user data with existing session:', error);
+            // Clear loading state
+            if (goalsContainer) {
+                goalsContainer.innerHTML = '';
+            }
+            
+            // If session is invalid, clear it and show auth screen
+            if (error.message.includes('401') || error.message.includes('403')) {
+                console.log('Session expired, clearing and showing auth screen');
+                clearSession();
+                showAuthScreen();
+            } else {
+                showError('Failed to load your data. Please try refreshing the page.');
+            }
+        }
+    } else {
+        console.log('No existing session found, trying auth bypass...');
+        // Try auth bypass first, if not available show auth screen
+        const bypassed = await tryBypassAuth();
+        if (!bypassed) {
+            console.log('Auth bypass not available, showing auth screen');
+            showAuthScreen();
+        }
+    }
     
     console.log('KidGoals app initialized');
 });

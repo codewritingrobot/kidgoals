@@ -91,6 +91,11 @@ self.addEventListener('fetch', event => {
         return;
     }
     
+    // Skip API requests - don't cache these as they need fresh authentication
+    if (event.request.url.includes('/api/')) {
+        return fetch(event.request);
+    }
+    
     event.respondWith(
         caches.match(event.request)
             .then(response => {
@@ -110,7 +115,7 @@ self.addEventListener('fetch', event => {
                         // Clone the response
                         const responseToCache = response.clone();
                         
-                        // Cache the response for future use
+                        // Cache the response for future use (only for static assets)
                         caches.open(CACHE_NAME)
                             .then(cache => {
                                 cache.put(event.request, responseToCache);
