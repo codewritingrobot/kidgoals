@@ -870,6 +870,102 @@ function getGoalChildren(goal) {
 }
 
 async function createGoalCard(goal, goalGroup = [goal]) {
+    // Use the enhanced template
+    const template = document.getElementById('enhanced-goal-card-template');
+    if (!template) {
+        console.error('Enhanced goal card template not found');
+        return createLegacyGoalCard(goal, goalGroup);
+    }
+    
+    const card = template.content.cloneNode(true);
+    const cardElement = card.querySelector('.enhanced-goal-card');
+    cardElement.dataset.goalId = goal.id;
+    
+    const progress = calculateProgress(goal);
+    const milestones = calculateMilestones(goal);
+    const goalChildren = getGoalChildren(goal);
+    const theme = STORY_THEMES[goal.type] || STORY_THEMES.countdown;
+    
+    // Populate goal name
+    const goalName = cardElement.querySelector('.goal-name');
+    goalName.textContent = goal.name;
+    
+    // Add emoji to goal name if it has one
+    if (goal.name.includes('🦷') || goal.name.includes('Brush Teeth')) {
+        goalName.innerHTML = `🦷 ${goal.name.replace('🦷', '').trim()}`;
+    }
+    
+    // Populate child info
+    const childInfo = cardElement.querySelector('.goal-child-info');
+    if (goalChildren.length > 0) {
+        const child = goalChildren[0]; // Show first child for now
+        childInfo.innerHTML = `
+            <div class="goal-child-avatar" style="background: ${child.color}">
+                ${child.avatar}
+            </div>
+            <span class="goal-child-name">${child.name}</span>
+        `;
+    }
+    
+    // Set up action buttons with goal ID
+    cardElement.querySelectorAll('.action-btn').forEach(btn => {
+        btn.dataset.goalId = goal.id;
+    });
+    
+    // Populate progress circle
+    const progressBar = cardElement.querySelector('.progress-bar');
+    const circumference = 2 * Math.PI * 50; // radius = 50
+    const offset = circumference - (progress / 100) * circumference;
+    progressBar.style.strokeDashoffset = offset;
+    
+    // Populate progress center emoji
+    const progressEmoji = cardElement.querySelector('.progress-emoji');
+    progressEmoji.textContent = getProgressEmoji(progress, goal);
+    
+    // Populate progress percentage
+    const progressPercentage = cardElement.querySelector('.progress-percentage');
+    progressPercentage.textContent = `${Math.round(progress)}% Complete`;
+    
+    // Populate encouragement
+    const encouragement = cardElement.querySelector('.progress-encouragement');
+    encouragement.innerHTML = `⭐ ${getEncouragement(progress, goal.type, goal)}`;
+    
+    // Populate story section
+    const storyTitle = cardElement.querySelector('.story-title');
+    storyTitle.innerHTML = `${theme.character} ${theme.characterName}'s Forest Adventure`;
+    
+    const storyDescription = cardElement.querySelector('.story-description');
+    storyDescription.textContent = `${theme.characterName} ${theme.story}`;
+    
+    // Set up trail progress bar
+    const trailProgressBar = cardElement.querySelector('.trail-progress-bar');
+    trailProgressBar.style.setProperty('--progress-width', `${progress}%`);
+    
+    // Set up trail character
+    const trailCharacter = cardElement.querySelector('.trail-character');
+    trailCharacter.textContent = theme.character;
+    trailCharacter.style.left = `${progress}%`;
+    
+    // Populate milestones
+    const milestonesContainer = cardElement.querySelector('.trail-milestones');
+    milestonesContainer.innerHTML = milestones.map((milestone, index) => {
+        let status = '';
+        let content = '✓';
+        
+        if (milestone.achieved) {
+            status = 'completed';
+        } else if (progress >= milestone.percentage) {
+            status = 'current';
+        }
+        
+        return `<div class="trail-milestone ${status}">${status ? content : ''}</div>`;
+    }).join('');
+    
+    return cardElement;
+}
+
+// Legacy fallback function
+async function createLegacyGoalCard(goal, goalGroup = [goal]) {
     const card = document.createElement('div');
     card.className = 'goal-card';
     card.style.borderColor = goal.color;

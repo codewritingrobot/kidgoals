@@ -2948,7 +2948,7 @@ select:focus {
 }
 
 .add-goal-btn {
-    background: var(--gradient-warm);
+    background: #22C55E;
     color: var(--white);
     border: none;
     border-radius: var(--radius-xl);
@@ -2963,8 +2963,294 @@ select:focus {
 }
 
 .add-goal-btn:hover {
+    background: #16A34A;
     transform: translateY(-2px);
     box-shadow: var(--shadow-xl);
+}
+
+/* Enhanced Goal Card Styles - Match Screenshot */
+.enhanced-goal-card {
+    background: var(--white);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-6);
+    margin-bottom: var(--space-5);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--gray-200);
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-normal);
+}
+
+.enhanced-goal-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #06B6D4 0%, #0891B2 100%);
+}
+
+.enhanced-goal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+}
+
+/* Goal Header Styles */
+.enhanced-goal-card .goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-6);
+}
+
+.goal-title-section {
+    flex: 1;
+}
+
+.goal-title-section .goal-name {
+    font-size: 1.25rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-900);
+    margin: 0 0 var(--space-3) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.goal-child-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.goal-child-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    border: 2px solid var(--white);
+    box-shadow: var(--shadow-sm);
+}
+
+.goal-child-name {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    font-weight: var(--font-weight-medium);
+}
+
+/* Action Buttons */
+.enhanced-goal-card .goal-actions {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+}
+
+.enhanced-goal-card .action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: var(--gray-600);
+}
+
+.enhanced-goal-card .action-btn:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-300);
+    transform: scale(1.05);
+}
+
+.enhanced-goal-card .action-btn.complete {
+    background: #22C55E;
+    border-color: #22C55E;
+    color: var(--white);
+}
+
+.enhanced-goal-card .action-btn.complete:hover {
+    background: #16A34A;
+    border-color: #16A34A;
+}
+
+/* Progress Section */
+.enhanced-goal-card .goal-progress-section {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    margin-bottom: var(--space-6);
+}
+
+.progress-circle-container {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+}
+
+.enhanced-goal-card .progress-ring {
+    width: 80px;
+    height: 80px;
+    transform: rotate(-90deg);
+}
+
+.enhanced-goal-card .progress-track {
+    fill: none;
+    stroke: var(--gray-200);
+    stroke-width: 6;
+}
+
+.enhanced-goal-card .progress-bar {
+    fill: none;
+    stroke: #06B6D4;
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 314;
+    stroke-dashoffset: 314;
+    transition: stroke-dashoffset 1s ease-in-out;
+}
+
+.enhanced-goal-card .progress-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+}
+
+.enhanced-goal-card .progress-info {
+    flex: 1;
+}
+
+.enhanced-goal-card .progress-percentage {
+    font-size: 1.5rem;
+    font-weight: var(--font-weight-bold);
+    color: #06B6D4;
+    margin-bottom: var(--space-2);
+}
+
+.enhanced-goal-card .progress-encouragement {
+    background: var(--gray-100);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-4);
+    font-size: 0.875rem;
+    color: var(--gray-700);
+    line-height: 1.4;
+    font-style: italic;
+}
+
+/* Story Trail Section */
+.enhanced-goal-card .story-trail-section {
+    margin-top: var(--space-6);
+}
+
+.enhanced-goal-card .story-header {
+    margin-bottom: var(--space-4);
+}
+
+.enhanced-goal-card .story-title {
+    font-size: 1.125rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-900);
+    margin: 0 0 var(--space-2) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.enhanced-goal-card .story-description {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    line-height: 1.5;
+    margin-bottom: var(--space-4);
+}
+
+.enhanced-goal-card .trail-visual {
+    margin-bottom: var(--space-4);
+}
+
+.enhanced-goal-card .trail-progress-bar {
+    height: 8px;
+    background: var(--gray-200);
+    border-radius: var(--radius-full);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-4);
+}
+
+.enhanced-goal-card .trail-progress-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--progress-width, 0%);
+    background: linear-gradient(90deg, #06B6D4 0%, #0891B2 100%);
+    border-radius: var(--radius-full);
+    transition: width 1s ease-in-out;
+}
+
+.enhanced-goal-card .trail-character {
+    position: absolute;
+    top: -8px;
+    width: 24px;
+    height: 24px;
+    background: #F97316;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    transform: translateX(-50%);
+    transition: left 1s ease-in-out;
+    box-shadow: var(--shadow-md);
+}
+
+.enhanced-goal-card .trail-milestones {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 var(--space-2);
+}
+
+.enhanced-goal-card .trail-milestone {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-full);
+    border: 2px solid var(--gray-300);
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--gray-400);
+    transition: all var(--transition-fast);
+}
+
+.enhanced-goal-card .trail-milestone.completed {
+    background: #22C55E;
+    border-color: #22C55E;
+    color: var(--white);
+}
+
+.enhanced-goal-card .trail-milestone.current {
+    background: #06B6D4;
+    border-color: #06B6D4;
+    color: var(--white);
+    animation: currentPulse 2s ease-in-out infinite;
+}
+
+@keyframes currentPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
 }
 
 /* Enhanced Color Picker */

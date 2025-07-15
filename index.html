@@ -422,26 +422,38 @@
     <template id="enhanced-goal-card-template">
         <div class="enhanced-goal-card" data-goal-id="">
             <div class="goal-header">
-                <div class="goal-title">
+                <div class="goal-title-section">
                     <h3 class="goal-name"></h3>
-                    <div class="goal-avatars-row">
-                        <!-- Child avatars will be inserted here -->
+                    <div class="goal-child-info">
+                        <!-- Child avatar will be inserted here -->
                     </div>
                 </div>
-                <div class="enhanced-goal-actions">
-                    <button class="action-btn" title="View Details" onclick="openGoalDetail(this.dataset.goalId)">👁️</button>
-                    <button class="action-btn" title="View History" onclick="openCompletionHistory(this.dataset.goalId)">📊</button>
-                    <button class="action-btn" title="Edit Goal" onclick="editGoal(this.dataset.goalId)">✏️</button>
-                    <button class="action-btn" title="Delete Goal" onclick="deleteGoal(this.dataset.goalId)">🗑️</button>
-                    <button class="action-btn complete" title="Complete Goal" onclick="window.GoalarooEnhancements ? window.GoalarooEnhancements.completeGoal(this.dataset.goalId) : completeGoal(this.dataset.goalId)">✅</button>
+                <div class="goal-actions">
+                    <button class="action-btn view" title="View Details" onclick="openGoalDetail(this.dataset.goalId)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                    <button class="action-btn edit" title="Edit Goal" onclick="editGoal(this.dataset.goalId)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="action-btn complete" title="Complete Goal" onclick="window.GoalarooEnhancements ? window.GoalarooEnhancements.completeGoal(this.dataset.goalId) : completeGoal(this.dataset.goalId)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <path d="M20 6L9 17l-5-5"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
 
             <div class="goal-progress-section">
-                <div class="enhanced-progress-circle">
-                    <svg class="progress-ring" viewBox="0 0 80 80">
-                        <circle cx="40" cy="40" r="35" class="progress-track"/>
-                        <circle cx="40" cy="40" r="35" class="progress-bar"/>
+                <div class="progress-circle-container">
+                    <svg class="progress-ring" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="50" class="progress-track"/>
+                        <circle cx="60" cy="60" r="50" class="progress-bar"/>
                     </svg>
                     <div class="progress-center">
                         <span class="progress-emoji"></span>
@@ -453,27 +465,19 @@
                 </div>
             </div>
 
-            <div class="enhanced-story-trail">
+            <div class="story-trail-section">
                 <div class="story-header">
                     <h4 class="story-title"></h4>
                     <p class="story-description"></p>
                 </div>
-                <div class="enhanced-trail-visual">
+                <div class="trail-visual">
                     <div class="trail-progress-bar">
                         <div class="trail-character"></div>
                     </div>
-                    <div class="trail-destination"></div>
                 </div>
                 <div class="trail-milestones">
                     <!-- Milestones will be inserted here -->
                 </div>
-            </div>
-
-            <div class="goal-status">
-                <span class="status-badge"></span>
-                <span class="iteration-info" style="display: none;"></span>
-                <span class="streak-info" style="display: none;"></span>
-                <span class="longest-streak-info" style="display: none;"></span>
             </div>
         </div>
     </template>
