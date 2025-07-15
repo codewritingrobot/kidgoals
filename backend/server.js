@@ -16,6 +16,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // AWS Configuration
+const isDevelopment = process.env.NODE_ENV === 'development' || process.env.DEVELOPMENT_MODE === 'true';
+
 AWS.config.update({
   region: process.env.AWS_REGION || 'us-east-1',
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -107,8 +109,8 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// JWT Secret - fail fast if not configured
-const JWT_SECRET = process.env.JWT_SECRET;
+// JWT Secret - use default in development mode
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'development' ? 'dev-secret-key-change-in-production' : null);
 if (!JWT_SECRET) {
   console.error('JWT_SECRET environment variable is required');
   process.exit(1);
@@ -380,13 +382,25 @@ app.post('/api/auth/send-code', async (req, res) => {
       }
     }).promise();
     
-    // Send email
-    const emailSent = await sendMagicCodeEmail(email, code);
-    if (!emailSent) {
-      return res.status(500).json({ error: 'Failed to send email' });
-    }
+    // Check if we're in development mode
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.DEVELOPMENT_MODE === 'true';
     
-    res.json({ message: 'Magic code sent successfully' });
+    if (isDevelopment) {
+      // In development mode, skip email sending and return the code
+      console.log(`🔑 Development Mode - Magic code for ${email}: ${code}`);
+      res.json({ 
+        message: 'Magic code sent successfully (development mode)',
+        code: code 
+      });
+    } else {
+      // In production, send email
+      const emailSent = await sendMagicCodeEmail(email, code);
+      if (!emailSent) {
+        return res.status(500).json({ error: 'Failed to send email' });
+      }
+      
+      res.json({ message: 'Magic code sent successfully' });
+    }
   } catch (error) {
     console.error('Error sending magic code:', error);
     res.status(500).json({ error: 'Internal server error' });

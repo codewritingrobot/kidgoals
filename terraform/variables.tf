@@ -50,4 +50,10 @@ variable "jwt_secret" {
   description = "JWT secret for authentication"
   type        = string
   sensitive   = true
+}
+
+variable "development_mode" {
+  description = "Enable development mode (bypasses email sending and shows magic codes)"
+  type        = string
+  default     = "false"
 } 

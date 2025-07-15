@@ -17,7 +17,9 @@ const ICONS = [
 ];
 
 // API Configuration
-const API_BASE_URL = 'https://api.goalaroo.mcsoko.com';
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:3000' 
+    : 'https://api.goalaroo.mcsoko.com';
 const API_ENDPOINTS = {
     SEND_CODE: '/api/auth/send-code',
     VERIFY_CODE: '/api/auth/verify-code',
@@ -73,6 +75,9 @@ let selectedChildId = null;
 let editingGoalId = null;
 let authToken = null;
 let isOnline = navigator.onLine;
+
+// Development mode detection
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 // Service Worker Management
 let swRegistration = null;
@@ -513,12 +518,19 @@ async function sendMagicCode() {
     sendButton.disabled = true;
     
     try {
-        await apiCall(API_ENDPOINTS.SEND_CODE, {
+        const response = await apiCall(API_ENDPOINTS.SEND_CODE, {
             method: 'POST',
             body: JSON.stringify({ email })
         });
         
-        showSuccess('Magic code sent! Check your email.');
+        if (isDevelopment && response.code) {
+            // In development mode, show the magic code
+            showSuccess(`Magic code sent! Your code is: ${response.code}`);
+            console.log('🔑 Development Mode - Magic Code:', response.code);
+        } else {
+            showSuccess('Magic code sent! Check your email.');
+        }
+        
         document.getElementById('code-section').style.display = 'block';
         document.getElementById('email').disabled = true;
         sendButton.style.display = 'none';
@@ -595,6 +607,12 @@ function showAuthScreen() {
     document.getElementById('code-section').style.display = 'none';
     document.getElementById('send-code-btn').textContent = 'Send Magic Code';
     document.getElementById('send-code-btn').disabled = false;
+    
+    // Show development mode indicator if in development
+    const devIndicator = document.getElementById('dev-mode-indicator');
+    if (devIndicator) {
+        devIndicator.style.display = isDevelopment ? 'block' : 'none';
+    }
 }
 
 function showDashboard() {

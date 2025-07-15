@@ -278,6 +278,10 @@ resource "aws_ecs_task_definition" "app" {
           value = var.environment
         },
         {
+          name  = "DEVELOPMENT_MODE"
+          value = var.development_mode
+        },
+        {
           name  = "AWS_REGION"
           value = var.aws_region
         },
