@@ -1403,7 +1403,6 @@ input::placeholder {
 /* Enhanced Form Styles */
 .form-group {
   margin-bottom: var(--space-4);
-  margin: 20px;
 }
 
 .form-group:first-of-type {
@@ -1599,7 +1598,6 @@ input::placeholder {
   gap: var(--space-3);
   justify-content: flex-end;
   margin-top: var(--space-5);
-  margin-bottom: var(--space-5);
   padding-top: var(--space-4);
   border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
