@@ -699,9 +699,16 @@ function openEditChildModal(child) {
 
 async function renderGoals() {
     const container = document.getElementById('goals-container');
+    const goalsCountElement = document.getElementById('goals-count');
     if (!container) return;
     
     container.innerHTML = '';
+    
+    // Update goals count
+    const activeGoals = goals.filter(goal => goal.status !== 'completed');
+    if (goalsCountElement) {
+        goalsCountElement.textContent = `${activeGoals.length} goal${activeGoals.length !== 1 ? 's' : ''}`;
+    }
     
     if (children.length === 0) {
         container.innerHTML = `
@@ -709,7 +716,10 @@ async function renderGoals() {
                 <div class="empty-icon">👶</div>
                 <h3>No children yet</h3>
                 <p>Add your first child to start creating goals!</p>
-                <button onclick="showModal('add-child-modal')" class="btn-primary">Add Child</button>
+                <button onclick="showModal('add-child-modal')" class="btn-primary">
+                    <span class="btn-icon">✨</span>
+                    Add Child
+                </button>
             </div>
         `;
         return;
@@ -721,7 +731,10 @@ async function renderGoals() {
                 <div class="empty-icon">🎯</div>
                 <h3>No goals yet</h3>
                 <p>Create your first goal to start tracking progress!</p>
-                <button onclick="showModal('add-goal-modal')" class="btn-primary">Create Goal</button>
+                <button onclick="showModal('add-goal-modal')" class="btn-primary">
+                    <span class="btn-icon">✨</span>
+                    Create Goal
+                </button>
             </div>
         `;
         return;
@@ -813,39 +826,65 @@ async function createGoalCard(goal, goalGroup = [goal]) {
     
     card.innerHTML = `
         <div class="goal-header">
-            <div class="goal-info">
+            <div class="goal-title">
                 <h3>${goal.name}</h3>
-                <div class="goal-children">
+                <div class="goal-avatars-row">
                     ${goalChildren.map(child => `
-                        <span class="child-tag" style="background-color: ${child.color}">
-                            ${child.avatar} ${child.name}
-                        </span>
+                        <div class="goal-avatar-emoji" style="background: ${child.color}">
+                            ${child.avatar}
+                        </div>
                     `).join('')}
                 </div>
             </div>
             <div class="goal-actions">
-                <button onclick="openGoalDetail('${goal.id}')" class="btn-icon">👁️</button>
-                <button onclick="openCompletionHistory('${goal.id}')" class="btn-icon">📊</button>
-                <button onclick="editGoal('${goal.id}')" class="btn-icon">✏️</button>
-                <button onclick="deleteGoal('${goal.id}')" class="btn-icon">🗑️</button>
-                ${goal.status !== 'completed' ? `<button onclick="completeGoal('${goal.id}')" class="btn-icon" style="background: #34C759; color: white;">✅</button>` : `
-                    <button onclick="restartGoal('${goal.id}')" class="btn-icon" style="background: #007AFF; color: white;" title="Restart (keep history)">🔄</button>
-                    <button onclick="resetGoal('${goal.id}')" class="btn-icon" style="background: #FF3B30; color: white;" title="Reset (clear history)">🗑️</button>
-                `}
+                <button onclick="openGoalDetail('${goal.id}')" class="btn-icon" title="View Details">👁️</button>
+                <button onclick="openCompletionHistory('${goal.id}')" class="btn-icon" title="View History">📊</button>
+                <button onclick="editGoal('${goal.id}')" class="btn-icon" title="Edit Goal">✏️</button>
+                <button onclick="deleteGoal('${goal.id}')" class="btn-icon" title="Delete Goal">🗑️</button>
+                ${goal.status !== 'completed' ? 
+                    `<button onclick="completeGoal('${goal.id}')" class="btn-icon btn-success" title="Complete Goal">✅</button>` : 
+                    `<button onclick="restartGoal('${goal.id}')" class="btn-icon btn-primary" title="Restart Goal">🔄</button>
+                     <button onclick="resetGoal('${goal.id}')" class="btn-icon btn-danger" title="Reset Goal">🗑️</button>`
+                }
             </div>
         </div>
+        
         <div class="goal-progress">
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: ${progress}%; background-color: ${goal.color}"></div>
+            <div class="progress-circle">
+                <svg class="progress-ring" viewBox="0 0 60 60">
+                    <circle cx="30" cy="30" r="26" stroke="${goal.color}" stroke-width="4" fill="none" stroke-dasharray="163" stroke-dashoffset="${163 - (163 * progress / 100)}"/>
+                    <circle cx="30" cy="30" r="26" stroke="var(--gray-200)" stroke-width="4" fill="none"/>
+                </svg>
+                <div class="progress-center">
+                    <span class="progress-emoji">${getProgressEmoji(progress, goal)}</span>
+                </div>
             </div>
-            <div class="progress-text">${Math.round(progress)}%</div>
+            <div class="goal-info">
+                <div class="goal-time">${goal.type === 'timer' ? formatTimeRemaining(goal.totalDuration - (Date.now() - goal.startTime)) : `${Math.round(progress)}% complete`}</div>
+                <div class="goal-encouragement">${getEncouragement(progress, goal.type, goal)}</div>
+            </div>
         </div>
-        <div class="goal-trail">
-            ${createTrailSVG(goal, progress / 100)}
+        
+        <div class="story-trail">
+            <div class="story-header">
+                <h4 class="story-title">${STORY_THEMES[goal.type]?.characterName || 'Adventure'}</h4>
+                <p class="story-description">${STORY_THEMES[goal.type]?.story || 'Making progress on this goal!'}</p>
+            </div>
+            <div class="trail-container">
+                <div class="trail-path"></div>
+                <div class="trail-character" style="left: ${progress}%;">${STORY_THEMES[goal.type]?.character || '🦊'}</div>
+                <div class="trail-milestones">
+                    ${milestones.map((milestone, index) => `
+                        <div class="trail-milestone ${milestone.achieved ? 'completed' : progress >= milestone.percentage ? 'current' : ''}"></div>
+                    `).join('')}
+                </div>
+                <div class="trail-destination">${STORY_THEMES[goal.type]?.destination || '🏆'}</div>
+            </div>
+            <div class="trail-progress-text">${Math.round(progress)}% of the way there!</div>
         </div>
+        
         <div class="goal-status">
             <span class="status-badge ${goal.status}">${goal.status}</span>
-            ${goal.type === 'timer' ? `<span class="timer-info">${formatTimeRemaining(goal.totalDuration - (Date.now() - goal.startTime))}</span>` : ''}
             ${stats.iterationCount > 0 ? `<span class="iteration-info">🏆 ${stats.iterationCount} completions</span>` : ''}
             ${stats.currentStreak > 0 ? `<span class="streak-info">🔥 ${stats.currentStreak} streak</span>` : ''}
             ${stats.longestStreak > stats.currentStreak ? `<span class="longest-streak-info">⭐ ${stats.longestStreak} best</span>` : ''}

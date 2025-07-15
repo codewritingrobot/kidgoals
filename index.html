@@ -21,22 +21,35 @@
     <!-- Authentication Screen -->
     <div id="auth-screen" class="screen">
         <div class="auth-container">
-            <div class="logo" style="margin-bottom: 18px;">
-                <div style="font-size: 4rem; text-align: center; filter: drop-shadow(0 4px 16px #ffb30055);">🦘</div>
-                <h1 style="font-size: 2.8rem; font-weight: 900; letter-spacing: 1.5px; color: #fff; text-shadow: 0 4px 24px #764ba2aa, 0 1px 0 #fff; margin-bottom: 6px;">Goalaroo</h1>
-                <p style="font-size: 1.25rem; color: #fff; text-shadow: 0 2px 8px #764ba2aa; margin-bottom: 0;">Track your child's progress with fun! <span style="font-size:1.3rem;">🎉</span></p>
+            <div class="logo">
+                <div class="logo-emoji">🦘</div>
+                <h1>Goalaroo</h1>
+                <p>Track your child's progress with fun! <span class="sparkle">🎉</span></p>
             </div>
-            <div class="auth-form" style="background: rgba(255,255,255,0.98); box-shadow: 0 8px 32px rgba(118,75,162,0.18), 0 1.5px 0 #fff; border-radius: 28px; padding: 38px 28px 32px 28px; margin-bottom: 18px;">
-                <input type="email" id="email" placeholder="Enter your email" required style="font-size: 1.1rem;">
-                <button id="send-code-btn" class="btn-primary" style="font-size: 1.1rem; margin-top: 18px; box-shadow: 0 2px 12px #007aff33;">Send Magic Code</button>
+            <div class="auth-form">
+                <div class="form-header">
+                    <h2>Welcome Back</h2>
+                    <p>Enter your email to get started</p>
+                </div>
+                <input type="email" id="email" placeholder="Enter your email" required>
+                <button id="send-code-btn" class="btn-primary">
+                    <span class="btn-icon">✨</span>
+                    Send Magic Code
+                </button>
             </div>
-            <div id="code-section" style="display: none; background: rgba(255,255,255,0.98); box-shadow: 0 8px 32px rgba(118,75,162,0.18), 0 1.5px 0 #fff; border-radius: 28px; padding: 38px 28px 32px 28px; margin-bottom: 18px;">
-                <p style="color:#764ba2; font-weight:600;">Check your email for the magic code!</p>
-                <input type="text" id="code" placeholder="Enter 6-digit code" maxlength="6" style="font-size: 1.1rem;">
-                <button id="verify-code-btn" class="btn-primary" style="font-size: 1.1rem; margin-top: 18px; box-shadow: 0 2px 12px #007aff33;">Verify Code</button>
+            <div id="code-section" class="auth-form" style="display: none;">
+                <div class="form-header">
+                    <h2>Almost There!</h2>
+                    <p>Check your email for the magic code</p>
+                </div>
+                <input type="text" id="code" placeholder="Enter 6-digit code" maxlength="6">
+                <button id="verify-code-btn" class="btn-primary">
+                    <span class="btn-icon">🔐</span>
+                    Verify Code
+                </button>
             </div>
-            <div style="margin-top: 18px; text-align: center; color: #fff; font-size: 1.1rem; text-shadow: 0 2px 8px #764ba2aa;">
-                <span style="font-size:1.3rem;">🌈</span> Welcome to a world of positive goals!
+            <div class="auth-footer">
+                <span class="sparkle">🌈</span> Welcome to a world of positive goals!
             </div>
         </div>
     </div>
@@ -44,12 +57,17 @@
     <!-- Dashboard Screen -->
     <div id="dashboard" class="screen" style="display: none;">
         <header class="dashboard-header">
-            <div class="app-title-header" style="text-align:center; font-size:2rem; font-weight:700; margin-bottom:12px; letter-spacing:1px; color:#007AFF;">
-                🦘 Goalaroo
-            </div>
-            <div class="user-info">
-                <span id="user-email"></span>
-                <button id="logout-btn" class="btn-icon">🚪</button>
+            <div class="header-top">
+                <div class="app-title">
+                    <span class="app-icon">🦘</span>
+                    <h1>Goalaroo</h1>
+                </div>
+                <div class="user-info">
+                    <span id="user-email" class="user-email"></span>
+                    <button id="logout-btn" class="btn-icon" title="Logout">
+                        <span>🚪</span>
+                    </button>
+                </div>
             </div>
             <div class="child-selector">
                 <div class="child-avatars" id="child-avatars">
@@ -61,8 +79,14 @@
         <main class="dashboard-main">
             <div class="goals-container">
                 <div class="goals-header">
-                    <h2>Goals</h2>
-                    <button id="add-goal-btn" class="btn-primary">➕ Add Goal</button>
+                    <div class="goals-title">
+                        <h2>Goals</h2>
+                        <span class="goals-count" id="goals-count">0 goals</span>
+                    </div>
+                    <button id="add-goal-btn" class="btn-primary">
+                        <span class="btn-icon">➕</span>
+                        Add Goal
+                    </button>
                 </div>
                 <div id="goals-container" class="goals-list">
                     <!-- Goals will be dynamically added here -->
@@ -72,7 +96,7 @@
         
         <footer class="dashboard-footer">
             <div class="footer-content">
-                <span class="app-version" style="font-size: 0.8rem; color: #666;">v${APP_VERSION}</span>
+                <span class="app-version">v${APP_VERSION}</span>
             </div>
         </footer>
     </div>
