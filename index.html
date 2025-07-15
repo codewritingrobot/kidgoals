@@ -418,120 +418,244 @@
 
     <!-- Enhanced Templates -->
     
-    <!-- Enhanced Goal Card Template -->
-    <template id="enhanced-goal-card-template">
-        <div class="enhanced-goal-card" data-goal-id="">
-            <div class="goal-header">
-                <div class="goal-title-section">
-                    <h3 class="goal-name"></h3>
-                    <div class="goal-child-info">
-                        <!-- Child avatar will be inserted here -->
-                    </div>
-                </div>
-                <div class="goal-actions">
-                    <button class="action-btn view" title="View Details" onclick="openGoalDetail(this.dataset.goalId)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
-                    <button class="action-btn edit" title="Edit Goal" onclick="editGoal(this.dataset.goalId)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </button>
-                    <button class="action-btn complete" title="Complete Goal" onclick="window.GoalarooEnhancements ? window.GoalarooEnhancements.completeGoal(this.dataset.goalId) : completeGoal(this.dataset.goalId)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                            <path d="M20 6L9 17l-5-5"></path>
-                        </svg>
-                    </button>
+<!-- Replace the existing Enhanced Goal Card Template -->
+<template id="enhanced-goal-card-template">
+    <div class="enhanced-goal-card" data-goal-id="">
+        <div class="goal-header">
+            <div class="goal-title-section">
+                <h3 class="goal-name"></h3>
+                <div class="goal-child-info">
+                    <!-- Child avatar will be inserted here -->
                 </div>
             </div>
-
-            <div class="goal-progress-section">
-                <div class="progress-circle-container">
-                    <svg class="progress-ring" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r="50" class="progress-track"/>
-                        <circle cx="60" cy="60" r="50" class="progress-bar"/>
+            <div class="goal-actions">
+                <button class="action-btn view" title="View Details" onclick="openGoalDetail(this.dataset.goalId)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
                     </svg>
-                    <div class="progress-center">
-                        <span class="progress-emoji"></span>
-                    </div>
-                </div>
-                <div class="progress-info">
-                    <div class="progress-percentage"></div>
-                    <div class="progress-encouragement"></div>
-                </div>
-            </div>
-
-            <div class="story-trail-section">
-                <div class="story-header">
-                    <h4 class="story-title"></h4>
-                    <p class="story-description"></p>
-                </div>
-                <div class="trail-visual">
-                    <div class="trail-progress-bar">
-                        <div class="trail-character"></div>
-                    </div>
-                </div>
-                <div class="trail-milestones">
-                    <!-- Milestones will be inserted here -->
-                </div>
+                </button>
+                <button class="action-btn history" title="View History" onclick="openCompletionHistory(this.dataset.goalId)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v5h5"></path>
+                        <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
+                        <path d="M12 7v5l4 2"></path>
+                    </svg>
+                </button>
+                <button class="action-btn edit" title="Edit Goal" onclick="editGoal(this.dataset.goalId)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>
+                <button class="action-btn complete" title="Complete Goal" onclick="window.GoalarooEnhancements ? window.GoalarooEnhancements.completeGoal(this.dataset.goalId) : completeGoal(this.dataset.goalId)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <path d="M20 6L9 17l-5-5"></path>
+                    </svg>
+                </button>
             </div>
         </div>
-    </template>
 
-    <!-- Enhanced Empty State Template -->
-    <template id="enhanced-empty-state-template">
-        <div class="enhanced-empty-state">
-            <div class="empty-icon-container">
-                <div class="empty-icon">🎯</div>
-                <div class="empty-icon-glow"></div>
+        <div class="goal-progress-section">
+            <div class="progress-circle-container">
+                <svg class="progress-ring" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" class="progress-track"/>
+                    <circle cx="60" cy="60" r="50" class="progress-bar"/>
+                </svg>
+                <div class="progress-center">
+                    <span class="progress-emoji"></span>
+                </div>
             </div>
-            <h3>Ready for Adventure?</h3>
-            <p>Create your first goal to start an exciting journey! Turn everyday tasks into magical adventures with progress tracking that kids love.</p>
-            <button class="enhanced-cta-btn" onclick="showModal('add-goal-modal')">
-                <span class="btn-shimmer"></span>
-                <span class="btn-content">
-                    <span class="btn-icon">✨</span>
-                    <span class="btn-text">Create First Goal</span>
-                </span>
-            </button>
-        </div>
-    </template>
-
-    <!-- Enhanced Child Avatar Template -->
-    <template id="enhanced-child-avatar-template">
-        <div class="enhanced-child-avatar" data-child-id="">
-            <div class="avatar-circle">
-                <span class="child-emoji"></span>
-            </div>
-            <div class="avatar-name"></div>
-            <button class="child-avatar-edit-btn" onclick="openEditChildModal(this.dataset.child)">
-                ✏️
-            </button>
-        </div>
-    </template>
-
-    <!-- Enhanced Completion Item Template -->
-    <template id="enhanced-completion-item-template">
-        <div class="enhanced-completion-item">
-            <div class="completion-icon">
-                <span class="completion-emoji">✅</span>
-            </div>
-            <div class="completion-details">
-                <div class="completion-date"></div>
-                <div class="completion-time"></div>
-                <div class="completion-notes"></div>
-            </div>
-            <div class="completion-meta">
-                <div class="completion-by"></div>
-                <div class="completion-celebration">🎉</div>
+            <div class="progress-info">
+                <div class="progress-percentage"></div>
+                <div class="progress-encouragement"></div>
             </div>
         </div>
-    </template>
 
+        <div class="story-trail-section">
+            <div class="story-header">
+                <h4 class="story-title"></h4>
+                <p class="story-description"></p>
+            </div>
+            <div class="trail-visual">
+                <div class="trail-progress-bar">
+                    <div class="trail-character"></div>
+                </div>
+            </div>
+            <div class="trail-milestones">
+                <!-- Milestones will be inserted here -->
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Enhanced Empty State Template -->
+<template id="enhanced-empty-state-template">
+    <div class="enhanced-empty-state">
+        <div class="empty-icon-container">
+            <div class="empty-icon">🎯</div>
+            <div class="empty-icon-glow"></div>
+        </div>
+        <h3>Ready for Adventure?</h3>
+        <p>Create your first goal to start an exciting journey! Turn everyday tasks into magical adventures with progress tracking that kids love.</p>
+        <button class="enhanced-cta-btn" onclick="window.GoalarooEnhancements ? window.GoalarooEnhancements.showModal('add-goal-modal') : showModal('add-goal-modal')">
+            <span class="btn-shimmer"></span>
+            <span class="btn-content">
+                <span class="btn-icon">✨</span>
+                <span class="btn-text">Create First Goal</span>
+            </span>
+        </button>
+    </div>
+</template>
+
+<!-- Enhanced Child Avatar Template -->
+<template id="enhanced-child-avatar-template">
+    <div class="child-avatar-container" data-child-id="">
+        <div class="child-avatar-emoji">
+            <span class="child-emoji"></span>
+        </div>
+        <div class="child-avatar-name"></div>
+        <button class="child-avatar-edit-btn" onclick="openEditChildModal(this.dataset.child)">
+            ✏️
+        </button>
+    </div>
+</template>
+
+
+<!-- Enhanced Completion Item Template -->
+<template id="enhanced-completion-item-template">
+    <div class="enhanced-completion-item">
+        <div class="completion-icon">
+            <span class="completion-emoji">✅</span>
+        </div>
+        <div class="completion-details">
+            <div class="completion-date"></div>
+            <div class="completion-time"></div>
+            <div class="completion-notes"></div>
+        </div>
+        <div class="completion-meta">
+            <div class="completion-by"></div>
+            <div class="completion-celebration">🎉</div>
+        </div>
+    </div>
+</template>
+
+<!-- Enhanced Loading Template -->
+<template id="enhanced-loading-template">
+    <div class="enhanced-loading-state">
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+        </div>
+        <div class="loading-text">Loading your goals...</div>
+    </div>
+</template>
+
+<!-- Enhanced Notification Template -->
+<template id="enhanced-notification-template">
+    <div class="enhanced-notification" data-type="success">
+        <div class="notification-content">
+            <span class="notification-icon">✅</span>
+            <span class="notification-text"></span>
+            <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+    </div>
+</template>
+
+    <!-- Script to add at the end of body, before app.js -->
+<script>
+    // Apply enhanced classes immediately when DOM loads
+    (function() {
+        'use strict';
+        
+        // Apply enhanced classes to auth container
+        function enhanceAuthScreen() {
+            const authContainer = document.querySelector('.auth-container');
+            if (authContainer) {
+                // Find all auth form containers and add enhanced class
+                const authForms = authContainer.querySelectorAll('.auth-form, .verify-form');
+                authForms.forEach(form => {
+                    if (!form.classList.contains('enhanced-auth-container')) {
+                        form.classList.add('enhanced-auth-container');
+                    }
+                });
+            }
+        }
+        
+        // Apply enhanced classes to dashboard
+        function enhanceDashboard() {
+            const dashboardHeader = document.querySelector('.dashboard-header');
+            if (dashboardHeader) {
+                dashboardHeader.classList.add('enhanced-header');
+            }
+            
+            const childSelector = document.querySelector('.child-selector, .header-top + div');
+            if (childSelector) {
+                childSelector.classList.add('enhanced-child-selector');
+            }
+            
+            const goalsContainer = document.querySelector('.goals-container');
+            if (goalsContainer) {
+                goalsContainer.classList.add('enhanced-goals-container');
+            }
+        }
+        
+        // Apply enhanced classes to inputs and buttons
+        function enhanceFormElements() {
+            document.querySelectorAll('input[type="email"], input[type="text"], input[type="number"], input[type="password"]').forEach(input => {
+                if (!input.classList.contains('enhanced-input')) {
+                    input.classList.add('enhanced-input');
+                }
+            });
+            
+            document.querySelectorAll('.btn-primary').forEach(btn => {
+                if (!btn.classList.contains('enhanced-btn')) {
+                    btn.classList.add('enhanced-btn');
+                }
+            });
+        }
+        
+        // Initialize on DOM content loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                enhanceAuthScreen();
+                enhanceDashboard();
+                enhanceFormElements();
+                
+                // Re-apply enhancements when screens change
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                            // Screen visibility changed
+                            setTimeout(() => {
+                                enhanceAuthScreen();
+                                enhanceDashboard();
+                                enhanceFormElements();
+                            }, 100);
+                        }
+                    });
+                });
+                
+                // Observe auth and dashboard screens
+                const authScreen = document.getElementById('auth-screen');
+                const dashboardScreen = document.getElementById('dashboard');
+                
+                if (authScreen) {
+                    observer.observe(authScreen, { attributes: true });
+                }
+                if (dashboardScreen) {
+                    observer.observe(dashboardScreen, { attributes: true });
+                }
+            });
+        } else {
+            enhanceAuthScreen();
+            enhanceDashboard();
+            enhanceFormElements();
+        }
+    })();
+    </script>
+    
     <!-- Network Status -->
     <div id="network-status" class="status online" style="position: fixed; top: 10px; right: 10px; z-index: 1000; padding: 5px 10px; border-radius: 4px; font-size: 12px;">
         🟢 Online

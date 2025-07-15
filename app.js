@@ -2643,3 +2643,500 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('Enhanced Goalaroo UI components initialized! 🎉');
 });
+
+// =============================================================================
+// INTEGRATION FIXES FOR ENHANCED GOALAROO UI/UX
+// =============================================================================
+
+// 1. Fix renderGoals() to use enhanced empty states
+async function renderGoals() {
+    const container = document.getElementById('goals-container');
+    const goalsCountElement = document.getElementById('goals-count');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Update goals count
+    const activeGoals = goals.filter(goal => goal.status !== 'completed');
+    if (goalsCountElement) {
+        goalsCountElement.textContent = `${activeGoals.length} goal${activeGoals.length !== 1 ? 's' : ''}`;
+    }
+    
+    if (children.length === 0) {
+        // Use enhanced empty state
+        if (window.GoalarooEnhancements) {
+            window.GoalarooEnhancements.showEmptyState(container, {
+                icon: '👶',
+                title: 'No children yet',
+                message: 'Add your first child to start creating goals!',
+                buttonText: 'Add Child',
+                buttonAction: () => window.GoalarooEnhancements ? window.GoalarooEnhancements.showModal('add-child-modal') : showModal('add-child-modal')
+            });
+        } else {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">👶</div>
+                    <h3>No children yet</h3>
+                    <p>Add your first child to start creating goals!</p>
+                    <button onclick="showModal('add-child-modal')" class="btn-primary">
+                        <span class="btn-icon">✨</span>
+                        Add Child
+                    </button>
+                </div>
+            `;
+        }
+        return;
+    }
+    
+    if (goals.length === 0) {
+        // Use enhanced empty state
+        if (window.GoalarooEnhancements) {
+            window.GoalarooEnhancements.showEmptyState(container, {
+                icon: '🎯',
+                title: 'Ready for Adventure?',
+                message: 'Create your first goal to start an exciting journey!',
+                buttonText: 'Create Goal',
+                buttonAction: () => window.GoalarooEnhancements ? window.GoalarooEnhancements.showModal('add-goal-modal') : showModal('add-goal-modal')
+            });
+        } else {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">🎯</div>
+                    <h3>No goals yet</h3>
+                    <p>Create your first goal to start tracking progress!</p>
+                    <button onclick="showModal('add-goal-modal')" class="btn-primary">
+                        <span class="btn-icon">✨</span>
+                        Create Goal
+                    </button>
+                </div>
+            `;
+        }
+        return;
+    }
+    
+    // Filter goals by selected child if one is selected
+    let filteredGoals = goals;
+    if (selectedChildId) {
+        filteredGoals = goals.filter(goal => goal.childId === selectedChildId);
+    }
+    
+    if (filteredGoals.length === 0) {
+        const childName = children.find(c => c.id === selectedChildId)?.name || 'this child';
+        // Use enhanced empty state
+        if (window.GoalarooEnhancements) {
+            window.GoalarooEnhancements.showEmptyState(container, {
+                icon: '🎯',
+                title: 'No goals for this child',
+                message: `Create a goal for ${childName}!`,
+                buttonText: 'Create Goal',
+                buttonAction: () => window.GoalarooEnhancements ? window.GoalarooEnhancements.showModal('add-goal-modal') : showModal('add-goal-modal')
+            });
+        } else {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">🎯</div>
+                    <h3>No goals for this child</h3>
+                    <p>Create a goal for ${childName}!</p>
+                    <button onclick="showModal('add-goal-modal')" class="btn-primary">Create Goal</button>
+                </div>
+            `;
+        }
+        return;
+    }
+    
+    // Group goals by groupId
+    const goalGroups = {};
+    filteredGoals.forEach(goal => {
+        if (goal.groupId) {
+            if (!goalGroups[goal.groupId]) {
+                goalGroups[goal.groupId] = [];
+            }
+            goalGroups[goal.groupId].push(goal);
+        } else {
+            // Single goal
+            goalGroups[goal.id] = [goal];
+        }
+    });
+    
+    // Create cards asynchronously with enhanced animations
+    const cardPromises = Object.values(goalGroups).map(async (goalGroup, index) => {
+        const goal = goalGroup[0]; // Use first goal for group info
+        const card = await createGoalCard(goal, goalGroup);
+        
+        // Apply enhanced animations if available
+        if (window.GoalarooEnhancements && card) {
+            setTimeout(() => {
+                if (typeof window.enhanceGoalCard === 'function') {
+                    window.enhanceGoalCard(card, index * 100);
+                }
+            }, 10);
+        }
+        
+        return card;
+    });
+    
+    // Wait for all cards to be created and add them to the container
+    const cards = await Promise.all(cardPromises);
+    cards.forEach(card => {
+        if (card) {
+            container.appendChild(card);
+        }
+    });
+}
+
+// 2. Fix showAddGoalModal to use enhanced modal
+function showAddGoalModal() {
+    // Initialize color picker
+    initializeColorPicker('goal-color', COLORS[0]);
+    
+    // Render children multiselect
+    const childrenContainer = document.getElementById('goal-children');
+    childrenContainer.innerHTML = '';
+    if (children.length === 0) {
+        childrenContainer.innerHTML = '<div style="color:#888;">No children available. Please add a child first.</div>';
+        document.querySelector('#add-goal-form button[type="submit"]').disabled = true;
+    } else {
+        children.forEach(child => {
+            const label = document.createElement('label');
+            label.style.display = 'inline-flex';
+            label.style.alignItems = 'center';
+            label.style.marginRight = '12px';
+            label.style.marginBottom = '8px';
+            label.innerHTML = `
+                <input type="checkbox" name="children" value="${child.id}" style="margin-right:6px;">${child.avatar} ${child.name}
+            `;
+            childrenContainer.appendChild(label);
+        });
+        document.querySelector('#add-goal-form button[type="submit"]').disabled = false;
+    }
+    
+    // Trigger goal type change handler to show appropriate form elements
+    const goalTypeSelect = document.getElementById('goal-type');
+    if (goalTypeSelect) {
+        goalTypeSelect.dispatchEvent(new Event('change'));
+    }
+    
+    // Use enhanced modal if available
+    if (window.GoalarooEnhancements && window.GoalarooEnhancements.showModal) {
+        window.GoalarooEnhancements.showModal('add-goal-modal');
+    } else {
+        showModal('add-goal-modal');
+    }
+}
+
+// 3. Override global functions to use enhanced versions
+if (window.GoalarooEnhancements) {
+    // Override showModal function
+    window.showModal = function(modalId) {
+        if (window.GoalarooEnhancements.showModal) {
+            return window.GoalarooEnhancements.showModal(modalId);
+        }
+        // Fallback to original implementation
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.add('active');
+        }
+    };
+    
+    // Override hideModal function
+    window.hideModal = function(modalId) {
+        if (window.GoalarooEnhancements.hideModal) {
+            return window.GoalarooEnhancements.hideModal(modalId);
+        }
+        // Fallback to original implementation
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    };
+    
+    // Override completeGoal function
+    window.completeGoal = function(goalId, notes) {
+        if (window.GoalarooEnhancements.completeGoal) {
+            return window.GoalarooEnhancements.completeGoal(goalId, notes);
+        }
+        // Fallback to original implementation
+        return originalCompleteGoal(goalId, notes);
+    };
+    
+    // Override selectChild function
+    window.selectChild = function(childId) {
+        if (window.GoalarooEnhancements.selectChild) {
+            return window.GoalarooEnhancements.selectChild(childId);
+        }
+        // Fallback to original implementation
+        selectedChildId = childId;
+        saveSelectedChild(childId);
+        renderChildAvatars();
+        renderGoals();
+    };
+    
+    // Override showSuccess and showError functions
+    window.showSuccess = function(message) {
+        if (window.GoalarooEnhancements.showNotification) {
+            return window.GoalarooEnhancements.showNotification(message, 'success');
+        }
+        alert(message);
+    };
+    
+    window.showError = function(message) {
+        if (window.GoalarooEnhancements.showNotification) {
+            return window.GoalarooEnhancements.showNotification(message, 'error');
+        }
+        alert('Error: ' + message);
+    };
+}
+
+// 4. Enhanced initialization function
+function initializeEnhancedFeatures() {
+    console.log('🎨 Initializing enhanced UI/UX features...');
+    
+    // Apply enhanced classes to existing elements
+    document.querySelectorAll('input[type="email"], input[type="text"], input[type="number"], select').forEach(input => {
+        if (!input.classList.contains('enhanced-input')) {
+            input.classList.add('enhanced-input');
+        }
+    });
+    
+    document.querySelectorAll('.btn-primary').forEach(btn => {
+        if (!btn.classList.contains('enhanced-btn')) {
+            btn.classList.add('enhanced-btn');
+        }
+    });
+    
+    // Add enhanced classes to containers
+    const authContainer = document.querySelector('.auth-container');
+    if (authContainer) {
+        authContainer.classList.add('enhanced-auth-container');
+    }
+    
+    const dashboardHeader = document.querySelector('.dashboard-header');
+    if (dashboardHeader) {
+        dashboardHeader.classList.add('enhanced-header');
+    }
+    
+    const goalsContainer = document.querySelector('.goals-container');
+    if (goalsContainer) {
+        goalsContainer.classList.add('enhanced-goals-container');
+    }
+    
+    // Initialize enhanced goal card animations
+    document.querySelectorAll('.goal-card').forEach((card, index) => {
+        if (typeof window.enhanceGoalCard === 'function') {
+            window.enhanceGoalCard(card, index * 100);
+        }
+    });
+    
+    // Set up enhanced event listeners
+    const addGoalBtn = document.getElementById('add-goal-btn');
+    if (addGoalBtn) {
+        addGoalBtn.onclick = showAddGoalModal;
+        addGoalBtn.classList.add('add-goal-btn');
+    }
+    
+    console.log('✨ Enhanced UI/UX features initialized!');
+}
+
+// 5. Enhanced DOMContentLoaded handler
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('KidGoals app initializing...');
+    
+    // Register service worker
+    registerServiceWorker();
+    
+    // Set up event listeners first
+    setupEventListeners();
+    
+    // Set up completion history filters
+    setupCompletionHistoryFilters();
+    
+    // Initialize enhanced features
+    initializeEnhancedFeatures();
+    
+    // Update online status
+    updateOnlineStatus();
+    
+    // Check for existing session and properly await data loading
+    const session = loadSession();
+    if (session) {
+        console.log('Found existing session, loading dashboard...');
+        showDashboard();
+        
+        // Show enhanced loading state
+        const goalsContainer = document.getElementById('goals-container');
+        if (goalsContainer) {
+            goalsContainer.innerHTML = `
+                <div class="enhanced-loading-state">
+                    <div class="loading-spinner">
+                        <div class="spinner-ring"></div>
+                        <div class="spinner-ring"></div>
+                        <div class="spinner-ring"></div>
+                    </div>
+                    <div class="loading-text">Loading your goals...</div>
+                </div>
+            `;
+        }
+        
+        try {
+            await loadUserData();
+            console.log('User data loaded successfully');
+        } catch (error) {
+            console.error('Failed to load user data with existing session:', error);
+            // Clear loading state
+            if (goalsContainer) {
+                goalsContainer.innerHTML = '';
+            }
+            
+            // If session is invalid, clear it and show auth screen
+            if (error.message.includes('401') || error.message.includes('403')) {
+                console.log('Session expired, clearing and showing auth screen');
+                clearSession();
+                showAuthScreen();
+            } else {
+                if (window.GoalarooEnhancements) {
+                    window.GoalarooEnhancements.showNotification('Failed to load your data. Please try refreshing the page.', 'error');
+                } else {
+                    showError('Failed to load your data. Please try refreshing the page.');
+                }
+            }
+        }
+    } else {
+        console.log('No existing session found, trying auth bypass...');
+        // Try auth bypass first, if not available show auth screen
+        const bypassed = await tryBypassAuth();
+        if (!bypassed) {
+            console.log('Auth bypass not available, showing auth screen');
+            showAuthScreen();
+        }
+    }
+    
+    console.log('🦘 KidGoals app initialized with enhanced UI/UX!');
+});
+
+// 6. Enhanced createGoalCard function fix
+async function createGoalCard(goal, goalGroup = [goal]) {
+    // Use the enhanced template
+    const template = document.getElementById('enhanced-goal-card-template');
+    if (!template) {
+        console.warn('Enhanced goal card template not found, using legacy template');
+        return createLegacyGoalCard(goal, goalGroup);
+    }
+    
+    const card = template.content.cloneNode(true);
+    const cardElement = card.querySelector('.enhanced-goal-card');
+    
+    if (!cardElement) {
+        console.warn('Enhanced goal card element not found in template, using legacy template');
+        return createLegacyGoalCard(goal, goalGroup);
+    }
+    
+    cardElement.dataset.goalId = goal.id;
+    
+    const progress = calculateProgress(goal);
+    const milestones = calculateMilestones(goal);
+    const goalChildren = getGoalChildren(goal);
+    const theme = STORY_THEMES[goal.type] || STORY_THEMES.countdown;
+    
+    // Populate goal name
+    const goalName = cardElement.querySelector('.goal-name');
+    if (goalName) {
+        goalName.textContent = goal.name;
+        
+        // Add emoji to goal name if it has one
+        if (goal.name.includes('🦷') || goal.name.includes('Brush Teeth')) {
+            goalName.innerHTML = `🦷 ${goal.name.replace('🦷', '').trim()}`;
+        }
+    }
+    
+    // Populate child info
+    const childInfo = cardElement.querySelector('.goal-child-info');
+    if (childInfo && goalChildren.length > 0) {
+        const child = goalChildren[0]; // Show first child for now
+        childInfo.innerHTML = `
+            <div class="goal-child-avatar" style="background: ${child.color}">
+                ${child.avatar}
+            </div>
+            <span class="goal-child-name">${child.name}</span>
+        `;
+    }
+    
+    // Set up action buttons with goal ID
+    cardElement.querySelectorAll('.action-btn').forEach(btn => {
+        btn.dataset.goalId = goal.id;
+    });
+    
+    // Populate progress circle
+    const progressBar = cardElement.querySelector('.progress-bar');
+    if (progressBar) {
+        const circumference = 2 * Math.PI * 50; // radius = 50
+        const offset = circumference - (progress / 100) * circumference;
+        progressBar.style.strokeDashoffset = offset;
+    }
+    
+    // Populate progress center emoji
+    const progressEmoji = cardElement.querySelector('.progress-emoji');
+    if (progressEmoji) {
+        progressEmoji.textContent = getProgressEmoji(progress, goal);
+    }
+    
+    // Populate progress percentage
+    const progressPercentage = cardElement.querySelector('.progress-percentage');
+    if (progressPercentage) {
+        progressPercentage.textContent = `${Math.round(progress)}% Complete`;
+    }
+    
+    // Populate encouragement
+    const encouragement = cardElement.querySelector('.progress-encouragement');
+    if (encouragement) {
+        encouragement.innerHTML = `⭐ ${getEncouragement(progress, goal.type, goal)}`;
+    }
+    
+    // Populate story section
+    const storyTitle = cardElement.querySelector('.story-title');
+    if (storyTitle) {
+        storyTitle.innerHTML = `${theme.character} ${theme.characterName}'s Forest Adventure`;
+    }
+    
+    const storyDescription = cardElement.querySelector('.story-description');
+    if (storyDescription) {
+        storyDescription.textContent = `${theme.characterName} ${theme.story}`;
+    }
+    
+    // Set up trail progress bar
+    const trailProgressBar = cardElement.querySelector('.trail-progress-bar');
+    if (trailProgressBar) {
+        trailProgressBar.style.setProperty('--progress-width', `${progress}%`);
+    }
+    
+    // Set up trail character
+    const trailCharacter = cardElement.querySelector('.trail-character');
+    if (trailCharacter) {
+        trailCharacter.textContent = theme.character;
+        trailCharacter.style.left = `${progress}%`;
+    }
+    
+    // Populate milestones
+    const milestonesContainer = cardElement.querySelector('.trail-milestones');
+    if (milestonesContainer) {
+        milestonesContainer.innerHTML = milestones.map((milestone, index) => {
+            let status = '';
+            let content = '✓';
+            
+            if (milestone.achieved) {
+                status = 'completed';
+            } else if (progress >= milestone.percentage) {
+                status = 'current';
+            }
+            
+            return `<div class="trail-milestone ${status}">${status ? content : ''}</div>`;
+        }).join('');
+    }
+    
+    return cardElement;
+}
+
+// 7. Global function overrides that were missing
+window.showAddGoalModal = showAddGoalModal;
+window.initializeEnhancedFeatures = initializeEnhancedFeatures;
+
+console.log('🔧 Enhanced UI/UX integration fixes loaded!');
