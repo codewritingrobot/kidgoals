@@ -1333,8 +1333,7 @@ input::placeholder {
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
   border-radius: var(--radius-2xl);
-  padding-left: 10px;
-  padding-right: 10px;
+  padding: 0;
   max-width: 480px;
   width: 100%;
   max-height: 90vh;
@@ -1396,7 +1395,7 @@ input::placeholder {
 }
 
 .modal-body {
-  padding: var(--space-6);
+  padding: var(--space-6) var(--space-6) var(--space-6);
   max-height: calc(90vh - 120px);
   overflow-y: auto;
 }
