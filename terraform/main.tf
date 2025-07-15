@@ -215,6 +215,27 @@ resource "aws_dynamodb_table" "user_data" {
   }
 }
 
+resource "aws_dynamodb_table" "goal_completions" {
+  name           = "goalaroo-goal-completions"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "email"
+  range_key      = "goalId"
+
+  attribute {
+    name = "email"
+    type = "S"
+  }
+
+  attribute {
+    name = "goalId"
+    type = "S"
+  }
+
+  tags = {
+    Name = "${var.project_name}-goal-completions-table"
+  }
+}
+
 # ECS Cluster
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
@@ -479,7 +500,8 @@ resource "aws_iam_policy" "ecs_task_policy" {
         Resource = [
           aws_dynamodb_table.users.arn,
           aws_dynamodb_table.magic_codes.arn,
-          aws_dynamodb_table.user_data.arn
+          aws_dynamodb_table.user_data.arn,
+          aws_dynamodb_table.goal_completions.arn
         ]
       },
       {
