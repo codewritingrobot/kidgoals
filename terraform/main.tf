@@ -219,7 +219,7 @@ resource "aws_dynamodb_table" "goal_completions" {
   name           = "goalaroo-goal-completions"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "email"
-  range_key      = "goalId"
+  range_key      = "completionId"
 
   attribute {
     name = "email"
@@ -227,7 +227,7 @@ resource "aws_dynamodb_table" "goal_completions" {
   }
 
   attribute {
-    name = "goalId"
+    name = "completionId"
     type = "S"
   }
 

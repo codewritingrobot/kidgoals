@@ -141,15 +141,18 @@ function verifyJWT(token) {
 
 // Completion event utility functions
 async function logGoalCompletion(email, goalId, childId, notes = null, completedBy = 'parent') {
+  const completionId = uuidv4();
+  const completedAt = Date.now();
+  
   const completionEvent = {
-    id: uuidv4(),
     email: email.toLowerCase(),
+    completionId: completionId,
     goalId: goalId,
     childId: childId,
-    completedAt: Date.now(),
+    completedAt: completedAt,
     completedBy: completedBy,
     notes: notes,
-    createdAt: Date.now()
+    createdAt: completedAt
   };
   
   await dynamodb.put({
@@ -163,7 +166,8 @@ async function logGoalCompletion(email, goalId, childId, notes = null, completed
 async function getGoalCompletions(email, goalId, fromTimestamp = null, toTimestamp = null) {
   const params = {
     TableName: TABLES.GOAL_COMPLETIONS,
-    KeyConditionExpression: 'email = :email AND goalId = :goalId',
+    KeyConditionExpression: 'email = :email',
+    FilterExpression: 'goalId = :goalId',
     ExpressionAttributeValues: {
       ':email': email.toLowerCase(),
       ':goalId': goalId
@@ -171,16 +175,12 @@ async function getGoalCompletions(email, goalId, fromTimestamp = null, toTimesta
   };
   
   if (fromTimestamp) {
-    params.FilterExpression = 'completedAt >= :from';
+    params.FilterExpression += ' AND completedAt >= :from';
     params.ExpressionAttributeValues[':from'] = fromTimestamp;
   }
   
   if (toTimestamp) {
-    if (params.FilterExpression) {
-      params.FilterExpression += ' AND completedAt <= :to';
-    } else {
-      params.FilterExpression = 'completedAt <= :to';
-    }
+    params.FilterExpression += ' AND completedAt <= :to';
     params.ExpressionAttributeValues[':to'] = toTimestamp;
   }
   
@@ -1505,11 +1505,7 @@ app.post('/api/goals/:id/reset', authenticateToken, async (req, res) => {
         TableName: TABLES.GOAL_COMPLETIONS,
         Key: {
           email: email.toLowerCase(),
-          goalId: id
-        },
-        ConditionExpression: 'id = :completionId',
-        ExpressionAttributeValues: {
-          ':completionId': completion.id
+          completionId: completion.completionId
         }
       }).promise();
     }
