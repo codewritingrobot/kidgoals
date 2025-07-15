@@ -27,6 +27,7 @@ const API_ENDPOINTS = {
     HEALTH: '/health',
     GOAL_COMPLETE: (goalId) => `/api/goals/${goalId}/complete`,
     GOAL_RESET: (goalId) => `/api/goals/${goalId}/reset`,
+    GOAL_RESTART: (goalId) => `/api/goals/${goalId}/restart`,
     GOAL_COMPLETIONS: (goalId) => `/api/goals/${goalId}/completions`,
     GOAL_STATS: (goalId) => `/api/goals/${goalId}/stats`
 };
@@ -827,7 +828,10 @@ async function createGoalCard(goal, goalGroup = [goal]) {
                 <button onclick="openCompletionHistory('${goal.id}')" class="btn-icon">📊</button>
                 <button onclick="editGoal('${goal.id}')" class="btn-icon">✏️</button>
                 <button onclick="deleteGoal('${goal.id}')" class="btn-icon">🗑️</button>
-                ${goal.status !== 'completed' ? `<button onclick="completeGoal('${goal.id}')" class="btn-icon" style="background: #34C759; color: white;">✅</button>` : `<button onclick="resetGoal('${goal.id}')" class="btn-icon" style="background: #FF9500; color: white;">🔄</button>`}
+                ${goal.status !== 'completed' ? `<button onclick="completeGoal('${goal.id}')" class="btn-icon" style="background: #34C759; color: white;">✅</button>` : `
+                    <button onclick="restartGoal('${goal.id}')" class="btn-icon" style="background: #007AFF; color: white;" title="Restart (keep history)">🔄</button>
+                    <button onclick="resetGoal('${goal.id}')" class="btn-icon" style="background: #FF3B30; color: white;" title="Reset (clear history)">🗑️</button>
+                `}
             </div>
         </div>
         <div class="goal-progress">
@@ -1066,6 +1070,21 @@ async function resetGoal(goalId) {
         showSuccess(`Goal reset successfully! Cleared ${result.deletedCompletions} completion events.`);
     } catch (error) {
         showError(error.message || 'Failed to reset goal');
+        throw error;
+    }
+}
+
+async function restartGoal(goalId) {
+    try {
+        const result = await apiCall(API_ENDPOINTS.GOAL_RESTART(goalId), {
+            method: 'POST'
+        });
+        
+        await loadGoals();
+        await renderGoals();
+        showSuccess('Goal restarted! Progress reset but completion history preserved.');
+    } catch (error) {
+        showError(error.message || 'Failed to restart goal');
         throw error;
     }
 }

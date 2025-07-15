@@ -1435,7 +1435,7 @@ app.get('/api/goals/:id/stats', authenticateToken, async (req, res) => {
  * @swagger
  * /api/goals/{id}/reset:
  *   post:
- *     summary: Reset a goal
+ *     summary: Reset a goal (hard reset)
  *     description: Resets a goal by clearing all completion events and resetting progress
  *     tags: [Goals]
  *     security:
@@ -1537,6 +1537,98 @@ app.post('/api/goals/:id/reset', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error resetting goal:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/goals/{id}/restart:
+ *   post:
+ *     summary: Restart a goal (soft reset)
+ *     description: Restarts a goal by resetting progress without clearing completion history
+ *     tags: [Goals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Goal ID
+ *     responses:
+ *       200:
+ *         description: Goal restarted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Goal restarted successfully"
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Goal not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post('/api/goals/:id/restart', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const { id } = req.params;
+    
+    // Get current data to verify goal exists
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const userData = result.Item || { children: [], goals: [] };
+    const goal = userData.goals.find(g => g.id === id);
+    
+    if (!goal) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    // Reset goal progress without clearing completion history
+    goal.current = 0;
+    goal.progress = 0;
+    goal.status = 'active';
+    goal.updatedAt = Date.now();
+    
+    // Save updated goal
+    await dynamodb.put({
+      TableName: TABLES.USER_DATA,
+      Item: {
+        email: email.toLowerCase(),
+        children: userData.children,
+        goals: userData.goals,
+        updatedAt: userData.updatedAt
+      }
+    }).promise();
+    
+    res.json({ 
+      message: 'Goal restarted successfully',
+      completionHistoryPreserved: true
+    });
+  } catch (error) {
+    console.error('Error restarting goal:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
