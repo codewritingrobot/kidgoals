@@ -192,21 +192,19 @@ function calculateStreak(completions, goalType) {
   if (!completions || completions.length === 0) return 0;
   
   const sorted = completions.sort((a, b) => b.completedAt - a.completedAt);
-  let streak = 0;
-  let currentDate = new Date();
+  let streak = 1; // Start with 1 for the most recent completion
   
-  for (let completion of sorted) {
-    const completionDate = new Date(completion.completedAt);
-    const daysDiff = Math.floor((currentDate - completionDate) / (1000 * 60 * 60 * 24));
+  for (let i = 1; i < sorted.length; i++) {
+    const prevDate = new Date(sorted[i-1].completedAt);
+    const currDate = new Date(sorted[i].completedAt);
+    const daysDiff = Math.floor((prevDate - currDate) / (1000 * 60 * 60 * 24));
     
     if (goalType === 'daily' && daysDiff <= 1) {
       streak++;
-      currentDate = completionDate;
     } else if (goalType === 'weekly' && daysDiff <= 7) {
       streak++;
-      currentDate = completionDate;
     } else {
-      break;
+      break; // Streak broken
     }
   }
   
@@ -1429,6 +1427,116 @@ app.get('/api/goals/:id/stats', authenticateToken, async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Error getting goal stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/goals/{id}/reset:
+ *   post:
+ *     summary: Reset a goal
+ *     description: Resets a goal by clearing all completion events and resetting progress
+ *     tags: [Goals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Goal ID
+ *     responses:
+ *       200:
+ *         description: Goal reset successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Goal reset successfully"
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Goal not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post('/api/goals/:id/reset', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const { id } = req.params;
+    
+    // Get current data to verify goal exists
+    const result = await dynamodb.get({
+      TableName: TABLES.USER_DATA,
+      Key: { email: email.toLowerCase() }
+    }).promise();
+    
+    const userData = result.Item || { children: [], goals: [] };
+    const goal = userData.goals.find(g => g.id === id);
+    
+    if (!goal) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    // Delete all completion events for this goal
+    const completions = await getGoalCompletions(email, id);
+    
+    // Delete each completion event
+    for (const completion of completions) {
+      await dynamodb.delete({
+        TableName: TABLES.GOAL_COMPLETIONS,
+        Key: {
+          email: email.toLowerCase(),
+          goalId: id
+        },
+        ConditionExpression: 'id = :completionId',
+        ExpressionAttributeValues: {
+          ':completionId': completion.id
+        }
+      }).promise();
+    }
+    
+    // Reset goal progress
+    goal.current = 0;
+    goal.progress = 0;
+    goal.status = 'active';
+    goal.updatedAt = Date.now();
+    
+    // Save updated goal
+    await dynamodb.put({
+      TableName: TABLES.USER_DATA,
+      Item: {
+        email: email.toLowerCase(),
+        children: userData.children,
+        goals: userData.goals,
+        updatedAt: userData.updatedAt
+      }
+    }).promise();
+    
+    res.json({ 
+      message: 'Goal reset successfully',
+      deletedCompletions: completions.length
+    });
+  } catch (error) {
+    console.error('Error resetting goal:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -26,6 +26,7 @@ const API_ENDPOINTS = {
     USER_DATA: '/api/user/data',
     HEALTH: '/health',
     GOAL_COMPLETE: (goalId) => `/api/goals/${goalId}/complete`,
+    GOAL_RESET: (goalId) => `/api/goals/${goalId}/reset`,
     GOAL_COMPLETIONS: (goalId) => `/api/goals/${goalId}/completions`,
     GOAL_STATS: (goalId) => `/api/goals/${goalId}/stats`
 };
@@ -1056,18 +1057,13 @@ async function completeGoal(goalId, notes = null) {
 
 async function resetGoal(goalId) {
     try {
-        const updatedGoal = await apiCall(`${API_ENDPOINTS.GOALS}/${goalId}`, {
-            method: 'PUT',
-            body: JSON.stringify({ 
-                status: 'active',
-                current: 0,
-                progress: 0
-            })
+        const result = await apiCall(API_ENDPOINTS.GOAL_RESET(goalId), {
+            method: 'POST'
         });
         
         await loadGoals();
         await renderGoals();
-        showSuccess('Goal reset successfully!');
+        showSuccess(`Goal reset successfully! Cleared ${result.deletedCompletions} completion events.`);
     } catch (error) {
         showError(error.message || 'Failed to reset goal');
         throw error;
