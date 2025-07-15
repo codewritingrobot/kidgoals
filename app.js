@@ -865,10 +865,8 @@ function calculateProgress(goal) {
             if (!isGoalInCurrentPeriod(goal)) {
                 return 0; // Goal is not active in current period
             }
-            return Math.min(100, ((goal.current || 0) / goal.target) * 100);
-        case 'countdown':
-        case 'countup':
-            return Math.min(100, ((goal.current || 0) / goal.target) * 100);
+            // For daily/weekly goals without target, progress is based on completion status
+            return goal.current > 0 ? 100 : 0;
         case 'timer':
             const elapsed = Date.now() - goal.startTime;
             return Math.min(100, (elapsed / goal.totalDuration) * 100);
@@ -1425,7 +1423,6 @@ function setupEventListeners() {
             
             // Add type-specific data
             if (goalData.type === 'daily' || goalData.type === 'weekly') {
-                goalData.target = parseInt(formData.get('target'));
                 goalData.current = 0;
                 goalData.repeat = formData.get('repeat') === 'on';
                 goalData.repeatSchedule = {
@@ -1438,9 +1435,6 @@ function setupEventListeners() {
                 goalData.unit = formData.get('unit');
                 goalData.totalDuration = convertToMilliseconds(goalData.duration, goalData.unit);
                 goalData.startTime = Date.now();
-            } else if (goalData.type === 'countdown' || goalData.type === 'countup') {
-                goalData.target = parseInt(formData.get('target'));
-                goalData.current = 0;
             }
             
             if (!goalData.name || goalData.childIds.length === 0) {
@@ -1449,18 +1443,8 @@ function setupEventListeners() {
             }
             
             // Validate type-specific requirements
-            if ((goalData.type === 'daily' || goalData.type === 'weekly') && !goalData.target) {
-                showError('Please enter a target for daily/weekly goals');
-                return;
-            }
-            
             if (goalData.type === 'timer' && !goalData.duration) {
                 showError('Please enter a duration for timer goals');
-                return;
-            }
-            
-            if ((goalData.type === 'countdown' || goalData.type === 'countup') && !goalData.target) {
-                showError('Please enter a target for count goals');
                 return;
             }
             
@@ -1484,15 +1468,12 @@ function setupEventListeners() {
                 // Hide all option groups
                 document.getElementById('recurring-options').style.display = 'none';
                 document.getElementById('timer-options').style.display = 'none';
-                document.getElementById('count-options').style.display = 'none';
                 
                 // Show relevant option group
                 if (selectedType === 'daily' || selectedType === 'weekly') {
                     document.getElementById('recurring-options').style.display = 'block';
                 } else if (selectedType === 'timer') {
                     document.getElementById('timer-options').style.display = 'block';
-                } else if (selectedType === 'countdown' || selectedType === 'countup') {
-                    document.getElementById('count-options').style.display = 'block';
                 }
             });
         }
@@ -1614,23 +1595,17 @@ function editGoal(goalId) {
     // Hide all option groups first
     document.getElementById('edit-recurring-options').style.display = 'none';
     document.getElementById('edit-timer-options').style.display = 'none';
-    document.getElementById('edit-count-options').style.display = 'none';
     
     // Show and populate relevant option group based on goal type
     if (goal.type === 'daily' || goal.type === 'weekly') {
         const recurringOptions = document.getElementById('edit-recurring-options');
         recurringOptions.style.display = 'block';
-        document.getElementById('edit-goal-target').value = goal.target || '';
         document.getElementById('edit-goal-repeat').checked = goal.repeat || false;
     } else if (goal.type === 'timer') {
         const timerOptions = document.getElementById('edit-timer-options');
         timerOptions.style.display = 'block';
         document.getElementById('edit-timer-duration').value = goal.duration || '';
         document.getElementById('edit-timer-unit').value = goal.unit || 'minutes';
-    } else if (goal.type === 'countdown' || goal.type === 'countup') {
-        const countOptions = document.getElementById('edit-count-options');
-        countOptions.style.display = 'block';
-        document.getElementById('edit-count-target').value = goal.target || '';
     }
     
     // Set up form submission
@@ -1647,13 +1622,10 @@ function editGoal(goalId) {
         
         // Add type-specific fields
         if (goal.type === 'daily' || goal.type === 'weekly') {
-            updates.target = parseInt(form.querySelector('#edit-goal-target').value) || 1;
             updates.repeat = form.querySelector('#edit-goal-repeat').checked;
         } else if (goal.type === 'timer') {
             updates.duration = parseInt(form.querySelector('#edit-timer-duration').value) || 30;
             updates.unit = form.querySelector('#edit-timer-unit').value;
-        } else if (goal.type === 'countdown' || goal.type === 'countup') {
-            updates.target = parseInt(form.querySelector('#edit-count-target').value) || 1;
         }
         
         try {
