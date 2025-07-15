@@ -1611,6 +1611,28 @@ function editGoal(goalId) {
     // Initialize color picker with current goal color
     initializeColorPicker('edit-goal-color', goal.color);
     
+    // Hide all option groups first
+    document.getElementById('edit-recurring-options').style.display = 'none';
+    document.getElementById('edit-timer-options').style.display = 'none';
+    document.getElementById('edit-count-options').style.display = 'none';
+    
+    // Show and populate relevant option group based on goal type
+    if (goal.type === 'daily' || goal.type === 'weekly') {
+        const recurringOptions = document.getElementById('edit-recurring-options');
+        recurringOptions.style.display = 'block';
+        document.getElementById('edit-goal-target').value = goal.target || '';
+        document.getElementById('edit-goal-repeat').checked = goal.repeat || false;
+    } else if (goal.type === 'timer') {
+        const timerOptions = document.getElementById('edit-timer-options');
+        timerOptions.style.display = 'block';
+        document.getElementById('edit-timer-duration').value = goal.duration || '';
+        document.getElementById('edit-timer-unit').value = goal.unit || 'minutes';
+    } else if (goal.type === 'countdown' || goal.type === 'countup') {
+        const countOptions = document.getElementById('edit-count-options');
+        countOptions.style.display = 'block';
+        document.getElementById('edit-count-target').value = goal.target || '';
+    }
+    
     // Set up form submission
     form.onsubmit = async function(e) {
         e.preventDefault();
@@ -1622,6 +1644,17 @@ function editGoal(goalId) {
             name: form.querySelector('#edit-goal-name').value.trim(),
             color: selectedColor
         };
+        
+        // Add type-specific fields
+        if (goal.type === 'daily' || goal.type === 'weekly') {
+            updates.target = parseInt(form.querySelector('#edit-goal-target').value) || 1;
+            updates.repeat = form.querySelector('#edit-goal-repeat').checked;
+        } else if (goal.type === 'timer') {
+            updates.duration = parseInt(form.querySelector('#edit-timer-duration').value) || 30;
+            updates.unit = form.querySelector('#edit-timer-unit').value;
+        } else if (goal.type === 'countdown' || goal.type === 'countup') {
+            updates.target = parseInt(form.querySelector('#edit-count-target').value) || 1;
+        }
         
         try {
             await updateGoal(goalId, updates);

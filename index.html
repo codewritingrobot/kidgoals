@@ -228,6 +228,38 @@
                     <label for="edit-goal-name">Goal Name</label>
                     <input type="text" id="edit-goal-name" name="name" required>
                 </div>
+                
+                <!-- Daily/Weekly Goal Options -->
+                <div class="form-group" id="edit-recurring-options" style="display: none;">
+                    <label for="edit-goal-target">Target</label>
+                    <input type="number" id="edit-goal-target" name="target" min="1" placeholder="e.g., 3 times per day/week">
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="edit-goal-repeat" name="repeat">
+                            Repeat automatically
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Timer Goal Options -->
+                <div class="form-group" id="edit-timer-options" style="display: none;">
+                    <label for="edit-timer-duration">Duration</label>
+                    <div class="duration-input">
+                        <input type="number" id="edit-timer-duration" name="duration" min="1" placeholder="e.g., 30">
+                        <select id="edit-timer-unit" name="unit">
+                            <option value="minutes">Minutes</option>
+                            <option value="hours">Hours</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Count Goal Options -->
+                <div class="form-group" id="edit-count-options" style="display: none;">
+                    <label for="edit-count-target">Target</label>
+                    <input type="number" id="edit-count-target" name="target" min="1" placeholder="e.g., 10">
+                </div>
+                
                 <div class="form-group">
                     <label>Choose Color</label>
                     <div class="color-picker" id="edit-goal-color">
