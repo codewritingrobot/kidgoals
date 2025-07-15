@@ -1320,6 +1320,7 @@ input::placeholder {
   opacity: 0;
   visibility: hidden;
   transition: all var(--transition-normal);
+  padding: var(--space-4);
 }
 
 .modal.active {
@@ -1333,7 +1334,8 @@ input::placeholder {
   -webkit-backdrop-filter: blur(30px);
   border-radius: var(--radius-2xl);
   padding: 0;
-  max-width: 90vw;
+  max-width: 480px;
+  width: 100%;
   max-height: 90vh;
   overflow: hidden;
   box-shadow: var(--shadow-2xl);
@@ -1349,7 +1351,7 @@ input::placeholder {
 
 .modal-header {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%);
-  padding: var(--space-6) var(--space-6) var(--space-4);
+  padding: var(--space-6) var(--space-6) var(--space-5);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
   justify-content: space-between;
@@ -1394,25 +1396,29 @@ input::placeholder {
 
 .modal-body {
   padding: var(--space-6);
-  max-height: 70vh;
+  max-height: calc(90vh - 120px);
   overflow-y: auto;
 }
 
 /* Enhanced Form Styles */
 .form-group {
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-6);
 }
 
 .form-group:first-of-type {
   margin-top: 0;
 }
 
+.form-group:last-of-type {
+  margin-bottom: 0;
+}
+
 .form-group label {
   display: block;
-  font-weight: var(--font-weight-medium);
-  color: var(--gray-700);
-  margin-bottom: var(--space-2);
-  font-size: 0.95rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--gray-800);
+  margin-bottom: var(--space-3);
+  font-size: 1rem;
   letter-spacing: -0.01em;
 }
 
@@ -1433,6 +1439,7 @@ textarea {
   -webkit-backdrop-filter: blur(10px);
   transition: all var(--transition-fast);
   color: var(--gray-900);
+  min-height: 48px;
 }
 
 input:focus, 
@@ -1588,20 +1595,26 @@ input::placeholder {
 /* Enhanced Form Actions */
 .form-actions {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-4);
   justify-content: flex-end;
-  margin-top: var(--space-6);
-  padding-top: var(--space-5);
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
   border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.form-actions button {
+  min-width: 100px;
+  flex: 1;
+  max-width: 150px;
 }
 
 /* Enhanced Color Picker */
 .color-picker, 
 .icon-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--space-3);
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .color-option, 
@@ -1619,6 +1632,7 @@ input::placeholder {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  position: relative;
 }
 
 .color-option {
@@ -1644,14 +1658,14 @@ input::placeholder {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .child-option {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-4);
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
@@ -1659,6 +1673,7 @@ input::placeholder {
   border: 2px solid rgba(0, 0, 0, 0.05);
   transition: all var(--transition-fast);
   cursor: pointer;
+  min-height: 56px;
 }
 
 .child-option:hover {
@@ -1676,6 +1691,7 @@ input::placeholder {
   font-weight: var(--font-weight-medium);
   color: var(--gray-700);
   flex: 1;
+  font-size: 1rem;
 }
 
 .child-option label:hover {
