@@ -1781,3 +1781,701 @@ function showAddGoalModal() {
     
     showModal('add-goal-modal');
 }
+
+// Enhanced JavaScript Improvements for Goalaroo UI/UX
+// These functions provide enhanced animations and user experience
+
+// Enhanced Notification System
+function showEnhancedNotification(message, type = 'success', duration = 3000) {
+    // Remove existing notifications
+    const existingNotifications = document.querySelectorAll('.enhanced-notification');
+    existingNotifications.forEach(notification => notification.remove());
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `enhanced-notification ${type}`;
+    
+    const icons = {
+        success: '✅',
+        error: '❌', 
+        info: 'ℹ️',
+        warning: '⚠️',
+        celebration: '🎉'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${icons[type] || icons.success}</span>
+            <span class="notification-text">${message}</span>
+            <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+    `;
+    
+    // Add styles if not already present
+    if (!document.querySelector('#notification-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'notification-styles';
+        styles.textContent = `
+            .enhanced-notification {
+                position: fixed;
+                top: var(--space-6);
+                right: var(--space-6);
+                background: rgba(52, 199, 89, 0.95);
+                color: var(--white);
+                padding: var(--space-4) var(--space-6);
+                border-radius: var(--radius-xl);
+                box-shadow: var(--shadow-xl);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                z-index: 10000;
+                transform: translateX(400px);
+                transition: all var(--transition-normal);
+                max-width: 320px;
+                font-weight: var(--font-weight-medium);
+            }
+            
+            .enhanced-notification.show {
+                transform: translateX(0);
+                animation: slideInBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            }
+            
+            .enhanced-notification.error {
+                background: rgba(255, 59, 48, 0.95);
+            }
+            
+            .enhanced-notification.info {
+                background: rgba(0, 122, 255, 0.95);
+            }
+            
+            .enhanced-notification.warning {
+                background: rgba(255, 149, 0, 0.95);
+            }
+            
+            .enhanced-notification.celebration {
+                background: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 100%);
+                animation: celebrationPulse 0.6s ease-in-out;
+            }
+            
+            .notification-content {
+                display: flex;
+                align-items: center;
+                gap: var(--space-3);
+            }
+            
+            .notification-icon {
+                font-size: 1.2rem;
+                flex-shrink: 0;
+            }
+            
+            .notification-text {
+                flex: 1;
+                line-height: 1.4;
+            }
+            
+            .notification-close {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                color: var(--white);
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1rem;
+                transition: all var(--transition-fast);
+                flex-shrink: 0;
+            }
+            
+            .notification-close:hover {
+                background: rgba(255, 255, 255, 0.3);
+                transform: scale(1.1);
+            }
+            
+            @keyframes slideInBounce {
+                0% { transform: translateX(400px); }
+                60% { transform: translateX(-20px); }
+                100% { transform: translateX(0); }
+            }
+            
+            @keyframes celebrationPulse {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+            }
+            
+            @media (max-width: 480px) {
+                .enhanced-notification {
+                    top: var(--space-4);
+                    left: var(--space-4);
+                    right: var(--space-4);
+                    transform: translateY(-100px);
+                    max-width: none;
+                }
+                
+                .enhanced-notification.show {
+                    transform: translateY(0);
+                }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Trigger animation
+    setTimeout(() => notification.classList.add('show'), 10);
+    
+    // Auto remove
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(400px)';
+        setTimeout(() => notification.remove(), 300);
+    }, duration);
+    
+    return notification;
+}
+
+// Enhanced Goal Completion with Animation
+async function enhancedCompleteGoal(goalId, notes = null) {
+    try {
+        // Find goal card
+        const goalCard = document.querySelector(`[data-goal-id="${goalId}"]`) || 
+                        document.querySelector('.goal-card'); // Fallback for demo
+        
+        if (goalCard) {
+            // Add completion animation class
+            goalCard.classList.add('completing');
+            
+            // Update progress visually
+            const progressRing = goalCard.querySelector('.progress-ring circle:last-child');
+            const progressCenter = goalCard.querySelector('.progress-center');
+            const progressPercentage = goalCard.querySelector('.progress-percentage, .goal-time');
+            const encouragement = goalCard.querySelector('.goal-encouragement');
+            
+            if (progressRing) {
+                progressRing.style.strokeDashoffset = '0';
+                progressRing.style.stroke = 'url(#successGradient)';
+            }
+            
+            if (progressCenter) {
+                progressCenter.innerHTML = '🏆';
+                progressCenter.style.background = 'linear-gradient(135deg, #34C759 0%, #2F855A 100%)';
+                progressCenter.style.color = 'white';
+                progressCenter.style.animation = 'celebrationSpin 1s ease-in-out';
+            }
+            
+            if (progressPercentage) {
+                progressPercentage.textContent = '100% Complete!';
+                progressPercentage.style.background = 'linear-gradient(135deg, #34C759 0%, #2F855A 100%)';
+                progressPercentage.style.webkitBackgroundClip = 'text';
+                progressPercentage.style.webkitTextFillColor = 'transparent';
+            }
+            
+            if (encouragement) {
+                encouragement.innerHTML = '🎉 Amazing! Goal completed! You\'re absolutely fantastic!';
+                encouragement.style.background = 'rgba(52, 199, 89, 0.1)';
+                encouragement.style.borderColor = 'rgba(52, 199, 89, 0.3)';
+            }
+            
+            // Update trail progress
+            const trailBar = goalCard.querySelector('.trail-progress-bar, .trail-path');
+            if (trailBar) {
+                trailBar.style.width = '100%';
+                trailBar.style.background = 'linear-gradient(135deg, #34C759 0%, #2F855A 100%)';
+            }
+            
+            // Update milestones
+            const milestones = goalCard.querySelectorAll('.trail-milestone');
+            milestones.forEach((milestone, index) => {
+                setTimeout(() => {
+                    milestone.classList.add('completed');
+                    milestone.textContent = '✓';
+                    milestone.style.background = 'linear-gradient(135deg, #34C759 0%, #2F855A 100%)';
+                    milestone.style.borderColor = '#34C759';
+                    milestone.style.color = 'white';
+                }, index * 200);
+            });
+            
+            // Create celebration particles
+            createCelebrationParticles(goalCard);
+            
+            // Remove completion class after animation
+            setTimeout(() => {
+                goalCard.classList.remove('completing');
+            }, 1000);
+        }
+        
+        // Call original complete goal function
+        await completeGoal(goalId, notes);
+        
+        // Show celebration notification
+        showEnhancedNotification(
+            '🎉 Fantastic! Goal completed! Keep up the amazing work!', 
+            'celebration', 
+            4000
+        );
+        
+    } catch (error) {
+        console.error('Error completing goal:', error);
+        showEnhancedNotification('Oops! Something went wrong. Please try again.', 'error');
+    }
+}
+
+// Create Celebration Particles Effect
+function createCelebrationParticles(container) {
+    const particles = ['🎉', '⭐', '✨', '🌟', '💫', '🏆'];
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'];
+    
+    for (let i = 0; i < 15; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'celebration-particle';
+        particle.textContent = particles[Math.floor(Math.random() * particles.length)];
+        
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        const randomX = Math.random() * 200 - 100;
+        const randomY = Math.random() * 200 - 100;
+        const randomRotation = Math.random() * 360;
+        const randomScale = 0.5 + Math.random() * 0.5;
+        
+        particle.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            font-size: ${1 + Math.random()}rem;
+            color: ${randomColor};
+            pointer-events: none;
+            z-index: 1000;
+            animation: celebrationFloat 2s ease-out forwards;
+            transform: translate(-50%, -50%);
+            --random-x: ${randomX}px;
+            --random-y: ${randomY}px;
+            --random-rotation: ${randomRotation}deg;
+            --random-scale: ${randomScale};
+        `;
+        
+        container.appendChild(particle);
+        
+        // Remove particle after animation
+        setTimeout(() => particle.remove(), 2000);
+    }
+    
+    // Add celebration animation styles if not present
+    if (!document.querySelector('#celebration-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'celebration-styles';
+        styles.textContent = `
+            @keyframes celebrationFloat {
+                0% {
+                    transform: translate(-50%, -50%) scale(0) rotate(0deg);
+                    opacity: 1;
+                }
+                50% {
+                    transform: translate(calc(-50% + var(--random-x)), calc(-50% + var(--random-y))) 
+                              scale(var(--random-scale)) rotate(calc(var(--random-rotation) / 2));
+                    opacity: 1;
+                }
+                100% {
+                    transform: translate(calc(-50% + var(--random-x) * 2), calc(-50% + var(--random-y) * 2)) 
+                              scale(0) rotate(var(--random-rotation));
+                    opacity: 0;
+                }
+            }
+            
+            @keyframes celebrationSpin {
+                0% { transform: scale(1) rotate(0deg); }
+                50% { transform: scale(1.2) rotate(180deg); }
+                100% { transform: scale(1) rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+}
+
+// Enhanced Progress Animation
+function animateProgressTo(element, targetPercentage, duration = 1500) {
+    if (!element) return;
+    
+    const circumference = 2 * Math.PI * 35; // Assuming radius of 35
+    const startOffset = parseFloat(element.style.strokeDashoffset) || circumference;
+    const endOffset = circumference - (circumference * targetPercentage / 100);
+    const startTime = performance.now();
+    
+    function updateProgress(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Use easing function for smooth animation
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        const currentOffset = startOffset + (endOffset - startOffset) * easeProgress;
+        
+        element.style.strokeDashoffset = currentOffset;
+        
+        if (progress < 1) {
+            requestAnimationFrame(updateProgress);
+        }
+    }
+    
+    requestAnimationFrame(updateProgress);
+}
+
+// Enhanced Child Selection with Animation
+function enhancedSelectChild(childId) {
+    // Remove previous selection
+    document.querySelectorAll('.child-avatar-container').forEach(container => {
+        container.querySelector('.child-avatar-emoji').classList.remove('selected');
+    });
+    
+    // Add selection to new child
+    const selectedContainer = document.querySelector(`[data-child-id="${childId}"]`) ||
+                             document.querySelector('.child-avatar-container'); // Fallback
+    
+    if (selectedContainer) {
+        const avatar = selectedContainer.querySelector('.child-avatar-emoji');
+        avatar.classList.add('selected');
+        
+        // Animate selection
+        avatar.style.animation = 'selectionBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+        
+        setTimeout(() => {
+            avatar.style.animation = '';
+        }, 600);
+    }
+    
+    // Call original selection function
+    selectChild(childId);
+    
+    // Show feedback
+    const childName = selectedContainer?.querySelector('.child-avatar-name')?.textContent || 'Child';
+    showEnhancedNotification(`👋 Switched to ${childName}'s goals!`, 'info', 2000);
+}
+
+// Enhanced Goal Card Rendering with Animation
+function enhanceGoalCard(goalCard, animationDelay = 0) {
+    // Add entrance animation
+    goalCard.style.opacity = '0';
+    goalCard.style.transform = 'translateY(20px) scale(0.95)';
+    goalCard.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+    
+    setTimeout(() => {
+        goalCard.style.opacity = '1';
+        goalCard.style.transform = 'translateY(0) scale(1)';
+    }, animationDelay);
+    
+    // Add hover enhancement
+    goalCard.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-4px) scale(1.02)';
+        this.style.boxShadow = 'var(--shadow-2xl)';
+    });
+    
+    goalCard.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0) scale(1)';
+        this.style.boxShadow = 'var(--shadow-lg)';
+    });
+    
+    // Add click feedback
+    goalCard.addEventListener('mousedown', function() {
+        this.style.transform = 'translateY(-2px) scale(1.01)';
+    });
+    
+    goalCard.addEventListener('mouseup', function() {
+        this.style.transform = 'translateY(-4px) scale(1.02)';
+    });
+}
+
+// Enhanced Empty State Animation
+function showEnhancedEmptyState(container, config = {}) {
+    const defaultConfig = {
+        icon: '🎯',
+        title: 'Ready for Adventure?',
+        message: 'Create your first goal to start an exciting journey!',
+        buttonText: 'Create Goal',
+        buttonAction: () => showModal('add-goal-modal')
+    };
+    
+    const finalConfig = { ...defaultConfig, ...config };
+    
+    container.innerHTML = `
+        <div class="enhanced-empty-state">
+            <div class="empty-icon-container">
+                <div class="empty-icon">${finalConfig.icon}</div>
+                <div class="empty-icon-glow"></div>
+            </div>
+            <h3>${finalConfig.title}</h3>
+            <p>${finalConfig.message}</p>
+            <button class="enhanced-cta-btn" onclick="(${finalConfig.buttonAction.toString()})()">
+                <span class="btn-shimmer"></span>
+                <span class="btn-content">
+                    <span class="btn-icon">✨</span>
+                    <span class="btn-text">${finalConfig.buttonText}</span>
+                </span>
+            </button>
+        </div>
+    `;
+    
+    // Add enhanced empty state styles
+    if (!document.querySelector('#empty-state-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'empty-state-styles';
+        styles.textContent = `
+            .enhanced-empty-state {
+                text-align: center;
+                padding: var(--space-16) var(--space-6);
+                position: relative;
+            }
+            
+            .empty-icon-container {
+                position: relative;
+                display: inline-block;
+                margin-bottom: var(--space-6);
+            }
+            
+            .empty-icon {
+                font-size: 5rem;
+                display: block;
+                animation: floatEmpty 4s ease-in-out infinite;
+                position: relative;
+                z-index: 2;
+            }
+            
+            .empty-icon-glow {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 120%;
+                height: 120%;
+                background: radial-gradient(circle, rgba(0, 122, 255, 0.1) 0%, transparent 70%);
+                border-radius: 50%;
+                transform: translate(-50%, -50%);
+                animation: glowPulse 3s ease-in-out infinite;
+                z-index: 1;
+            }
+            
+            .enhanced-empty-state h3 {
+                font-size: 1.8rem;
+                font-weight: var(--font-weight-semibold);
+                margin-bottom: var(--space-4);
+                background: var(--gradient-cool);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            
+            .enhanced-empty-state p {
+                font-size: 1.1rem;
+                line-height: 1.6;
+                max-width: 400px;
+                margin: 0 auto var(--space-8);
+                color: var(--gray-600);
+            }
+            
+            .enhanced-cta-btn {
+                background: var(--gradient-warm);
+                color: var(--white);
+                border: none;
+                border-radius: var(--radius-xl);
+                padding: var(--space-5) var(--space-8);
+                font-size: 1.1rem;
+                font-weight: var(--font-weight-semibold);
+                cursor: pointer;
+                transition: all var(--transition-normal);
+                position: relative;
+                overflow: hidden;
+                box-shadow: var(--shadow-lg);
+            }
+            
+            .enhanced-cta-btn:hover {
+                transform: translateY(-3px);
+                box-shadow: var(--shadow-xl);
+            }
+            
+            .btn-shimmer {
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+                transition: left var(--transition-slow);
+            }
+            
+            .enhanced-cta-btn:hover .btn-shimmer {
+                left: 100%;
+            }
+            
+            .btn-content {
+                display: flex;
+                align-items: center;
+                gap: var(--space-2);
+                position: relative;
+                z-index: 2;
+            }
+            
+            @keyframes floatEmpty {
+                0%, 100% { transform: translateY(0px) rotate(0deg); }
+                50% { transform: translateY(-15px) rotate(2deg); }
+            }
+            
+            @keyframes glowPulse {
+                0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+                50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.2; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    // Animate entrance
+    const emptyState = container.querySelector('.enhanced-empty-state');
+    emptyState.style.opacity = '0';
+    emptyState.style.transform = 'translateY(20px)';
+    
+    setTimeout(() => {
+        emptyState.style.transition = 'all 0.6s ease-out';
+        emptyState.style.opacity = '1';
+        emptyState.style.transform = 'translateY(0)';
+    }, 100);
+}
+
+// Enhanced Modal Animations
+function enhanceModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    
+    // Override the show function
+    window.showEnhancedModal = function(id) {
+        const targetModal = document.getElementById(id);
+        if (!targetModal) return;
+        
+        targetModal.classList.add('active');
+        const content = targetModal.querySelector('.modal-content');
+        
+        // Animate entrance
+        content.style.transform = 'scale(0.7) translateY(50px)';
+        content.style.opacity = '0';
+        
+        setTimeout(() => {
+            content.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+            content.style.transform = 'scale(1) translateY(0)';
+            content.style.opacity = '1';
+        }, 10);
+        
+        // Enhanced backdrop click
+        targetModal.addEventListener('click', function(e) {
+            if (e.target === targetModal) {
+                hideEnhancedModal(id);
+            }
+        });
+        
+        // Enhanced escape key
+        document.addEventListener('keydown', function escapeHandler(e) {
+            if (e.key === 'Escape') {
+                hideEnhancedModal(id);
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        });
+    };
+    
+    window.hideEnhancedModal = function(id) {
+        const targetModal = document.getElementById(id);
+        if (!targetModal) return;
+        
+        const content = targetModal.querySelector('.modal-content');
+        content.style.transform = 'scale(0.9) translateY(20px)';
+        content.style.opacity = '0';
+        
+        setTimeout(() => {
+            targetModal.classList.remove('active');
+            content.style.transform = '';
+            content.style.opacity = '';
+            content.style.transition = '';
+        }, 300);
+    };
+}
+
+// Initialize all enhancements
+function initializeEnhancements() {
+    // Enhance existing goal cards
+    document.querySelectorAll('.goal-card').forEach((card, index) => {
+        enhanceGoalCard(card, index * 100);
+    });
+    
+    // Enhance modals
+    ['add-child-modal', 'edit-child-modal', 'add-goal-modal', 'edit-goal-modal', 'completion-history-modal'].forEach(enhanceModal);
+    
+    // Add selection animation styles
+    if (!document.querySelector('#selection-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'selection-styles';
+        styles.textContent = `
+            @keyframes selectionBounce {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.15); }
+                100% { transform: scale(1.05); }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    console.log('🎉 Goalaroo UI enhancements initialized!');
+}
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeEnhancements);
+} else {
+    initializeEnhancements();
+}
+
+// Export enhanced functions for global use
+window.GoalarooEnhancements = {
+    showNotification: showEnhancedNotification,
+    completeGoal: enhancedCompleteGoal,
+    selectChild: enhancedSelectChild,
+    showEmptyState: showEnhancedEmptyState,
+    showModal: showEnhancedModal,
+    hideModal: hideEnhancedModal,
+    animateProgress: animateProgressTo,
+    createParticles: createCelebrationParticles
+};
+
+// Integration with existing functions - enhance original functions with new capabilities
+const originalCompleteGoal = window.completeGoal;
+if (originalCompleteGoal) {
+    window.completeGoal = function(goalId, notes) {
+        // Use enhanced version if available
+        if (window.GoalarooEnhancements) {
+            return window.GoalarooEnhancements.completeGoal(goalId, notes);
+        }
+        return originalCompleteGoal(goalId, notes);
+    };
+}
+
+const originalSelectChild = window.selectChild;
+if (originalSelectChild) {
+    window.selectChild = function(childId) {
+        // Use enhanced version if available
+        if (window.GoalarooEnhancements) {
+            return window.GoalarooEnhancements.selectChild(childId);
+        }
+        return originalSelectChild(childId);
+    };
+}
+
+// Initialize enhanced features when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Add enhanced classes to existing elements
+    document.querySelectorAll('input[type="email"], input[type="text"], input[type="number"], select').forEach(input => {
+        if (!input.classList.contains('enhanced-input')) {
+            input.classList.add('enhanced-input');
+        }
+    });
+    
+    document.querySelectorAll('.btn-primary').forEach(btn => {
+        if (!btn.classList.contains('enhanced-btn')) {
+            btn.classList.add('enhanced-btn');
+        }
+    });
+    
+    console.log('Enhanced Goalaroo UI components initialized! 🎉');
+});

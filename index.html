@@ -16,34 +16,71 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Goalaroo">
     <link rel="stylesheet" href="styles.css">
+    
+    <!-- Enhanced Progress Ring SVG Definitions -->
+    <svg style="display: none;">
+        <defs>
+            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#00C7BE"/>
+                <stop offset="100%" style="stop-color:#007AFF"/>
+            </linearGradient>
+            <linearGradient id="successGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#34C759"/>
+                <stop offset="100%" style="stop-color:#2F855A"/>
+            </linearGradient>
+        </defs>
+    </svg>
 </head>
 <body>
     <!-- Authentication Screen -->
     <div id="auth-screen" class="screen">
         <div class="auth-container">
-            <div class="logo">
-                <div class="logo-emoji">🦘</div>
+            <div class="enhanced-logo">
+                <div class="logo-container">
+                    <div class="logo-emoji">🦘</div>
+                </div>
                 <h1>Goalaroo</h1>
-                <p>Track your child's progress with fun! <span class="sparkle">🎉</span></p>
+                <p class="tagline">Transform goals into adventures! <span class="sparkle">🎉</span></p>
+                <p class="subtitle">Make progress tracking fun for kids with interactive stories and rewards</p>
             </div>
-            <div class="auth-form">
+
+            <!-- Enhanced Feature Preview Section -->
+            <div class="feature-preview">
+                <div class="feature-card">
+                    <span class="feature-icon">🎯</span>
+                    <h3>Interactive Goals</h3>
+                    <p>Turn daily tasks into exciting adventures with story-driven progress tracking</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">👨‍👩‍👧‍👦</span>
+                    <h3>Family Friendly</h3>
+                    <p>Manage multiple children's goals with personalized avatars and themes</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3>Progress Insights</h3>
+                    <p>Track streaks, celebrate milestones, and build positive habits together</p>
+                </div>
+            </div>
+            <div class="enhanced-auth-form">
                 <div class="form-header">
                     <h2>Welcome Back</h2>
                     <p>Enter your email to get started</p>
                 </div>
-                <input type="email" id="email" placeholder="Enter your email" required>
-                <button id="send-code-btn" class="btn-primary">
+                <input type="email" id="email" class="enhanced-input" placeholder="Enter your email" required>
+                <button id="send-code-btn" class="enhanced-btn">
                     <span class="btn-icon">✨</span>
                     Send Magic Code
                 </button>
             </div>
-            <div id="code-section" class="auth-form" style="display: none;">
+
+            <div id="code-section" class="enhanced-auth-form" style="display: none;">
                 <div class="form-header">
                     <h2>Almost There!</h2>
                     <p>Check your email for the magic code</p>
                 </div>
-                <input type="text" id="code" placeholder="Enter 6-digit code" maxlength="6">
-                <button id="verify-code-btn" class="btn-primary">
+                <input type="text" id="code" class="enhanced-input" placeholder="Enter 6-digit code" maxlength="6">
+                <button id="verify-code-btn" class="enhanced-btn">
                     <span class="btn-icon">🔐</span>
                     Verify Code
                 </button>
@@ -59,42 +96,41 @@
 
     <!-- Dashboard Screen -->
     <div id="dashboard" class="screen" style="display: none;">
-        <header class="dashboard-header">
+        <header class="enhanced-header">
             <div class="header-top">
                 <div class="app-brand">
-                    <div class="app-logo">
-                        <span class="app-icon">🦘</span>
-                        <h1>Goalaroo</h1>
-                    </div>
-                    <div class="user-controls">
-                        <span id="user-email" class="user-email"></span>
-                        <button id="logout-btn" class="btn-icon" title="Logout">
-                            <span>🚪</span>
-                        </button>
-                    </div>
+                    <span class="app-icon">🦘</span>
+                    <h1 class="app-title">Goalaroo</h1>
+                </div>
+                <div class="user-controls">
+                    <span id="user-email" class="user-email"></span>
+                    <button id="logout-btn" class="btn-icon" title="Logout">
+                        <span>🚪</span>
+                    </button>
                 </div>
             </div>
-            <div class="child-selector">
-                <div class="child-avatars" id="child-avatars">
-                    <!-- Child avatars will be dynamically added here -->
+            <div class="enhanced-child-selector">
+                <div id="child-avatars" class="child-avatars">
+                    <!-- Enhanced child avatars will be rendered here -->
                 </div>
             </div>
         </header>
 
         <main class="dashboard-main">
-            <div class="goals-container">
+            <!-- Enhanced Goals Container -->
+            <div class="enhanced-goals-container">
                 <div class="goals-header">
                     <div class="goals-title">
                         <h2>Goals</h2>
                         <span class="goals-count" id="goals-count">0 goals</span>
                     </div>
-                    <button id="add-goal-btn" class="btn-primary">
+                    <button id="add-goal-btn" class="add-goal-btn">
                         <span class="btn-icon">➕</span>
-                        Add Goal
+                        <span>Add Goal</span>
                     </button>
                 </div>
                 <div id="goals-container" class="goals-list">
-                    <!-- Goals will be dynamically added here -->
+                    <!-- Enhanced goal cards will be rendered here -->
                 </div>
             </div>
         </main>
@@ -106,33 +142,36 @@
         </footer>
     </div>
 
-    <!-- Add Child Modal -->
+    <!-- Enhanced Add Child Modal -->
     <div id="add-child-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Add New Child</h3>
-                <button class="close-btn" onclick="hideModal('add-child-modal')">✕</button>
+                <button class="close-btn" onclick="window.GoalarooEnhancements ? window.GoalarooEnhancements.hideModal('add-child-modal') : hideModal('add-child-modal')">✕</button>
             </div>
-            <form id="add-child-form">
+            <form id="add-child-form" class="enhanced-form">
                 <div class="form-group">
                     <label for="child-name">Child's Name</label>
-                    <input type="text" id="child-name" name="name" required>
+                    <input type="text" id="child-name" name="name" class="enhanced-input" required>
                 </div>
                 <div class="form-group">
                     <label>Choose Avatar</label>
-                    <div class="icon-picker" id="add-child-avatar">
+                    <div class="enhanced-icon-picker" id="add-child-avatar">
                         <!-- Avatars will be added dynamically -->
                     </div>
                 </div>
                 <div class="form-group">
                     <label>Choose Color</label>
-                    <div class="color-picker" id="add-child-color">
+                    <div class="enhanced-color-picker" id="add-child-color">
                         <!-- Colors will be added dynamically -->
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" onclick="hideModal('add-child-modal')">Cancel</button>
-                    <button type="submit" class="btn-primary">Add Child</button>
+                    <button type="button" class="btn-secondary" onclick="window.GoalarooEnhancements ? window.GoalarooEnhancements.hideModal('add-child-modal') : hideModal('add-child-modal')">Cancel</button>
+                    <button type="submit" class="enhanced-btn">
+                        <span class="btn-icon">✨</span>
+                        Add Child
+                    </button>
                 </div>
             </form>
         </div>
@@ -300,58 +339,64 @@
         </div>
     </div>
 
-    <!-- Completion History Modal -->
+    <!-- Enhanced Completion History Modal -->
     <div id="completion-history-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Completion History</h3>
-                <button class="close-btn" onclick="hideModal('completion-history-modal')">✕</button>
+                <button class="close-btn" onclick="window.GoalarooEnhancements ? window.GoalarooEnhancements.hideModal('completion-history-modal') : hideModal('completion-history-modal')">✕</button>
             </div>
             <div class="modal-body">
-                <div class="completion-stats">
+                <div class="enhanced-completion-stats">
                     <div class="stat-card">
+                        <div class="stat-icon">🏆</div>
                         <div class="stat-number" id="total-completions">0</div>
                         <div class="stat-label">Total Completions</div>
                     </div>
                     <div class="stat-card">
+                        <div class="stat-icon">🔥</div>
                         <div class="stat-number" id="current-streak">0</div>
                         <div class="stat-label">Current Streak</div>
                     </div>
                     <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
                         <div class="stat-number" id="longest-streak">0</div>
                         <div class="stat-label">Longest Streak</div>
                     </div>
                 </div>
                 
-                <div class="completion-filters">
+                <div class="enhanced-completion-filters">
                     <button class="filter-btn active" data-filter="all">All Time</button>
                     <button class="filter-btn" data-filter="week">This Week</button>
                     <button class="filter-btn" data-filter="month">This Month</button>
                 </div>
                 
-                <div class="completion-insights" id="completion-insights" style="display: none;">
+                <div class="enhanced-completion-insights" id="completion-insights" style="display: none;">
                     <h4>📈 Insights</h4>
                     <div class="insights-grid">
                         <div class="insight-item">
+                            <div class="insight-icon">📊</div>
                             <div class="insight-label">Average per day</div>
                             <div class="insight-value" id="avg-per-day">-</div>
                         </div>
                         <div class="insight-item">
+                            <div class="insight-icon">🌟</div>
                             <div class="insight-label">Best day</div>
                             <div class="insight-value" id="best-day">-</div>
                         </div>
                         <div class="insight-item">
+                            <div class="insight-icon">📝</div>
                             <div class="insight-label">Notes added</div>
                             <div class="insight-value" id="notes-count">-</div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="completion-list" id="completion-list">
+                <div class="enhanced-completion-list" id="completion-list">
                     <!-- Completion history will be populated dynamically -->
                 </div>
                 
-                <div class="completion-empty" id="completion-empty" style="display: none;">
+                <div class="enhanced-completion-empty" id="completion-empty" style="display: none;">
                     <div class="empty-icon">📊</div>
                     <h4>No completions yet</h4>
                     <p>Complete this goal to see your progress history!</p>
@@ -359,6 +404,123 @@
             </div>
         </div>
     </div>
+
+    <!-- Enhanced Notification Container -->
+    <div id="notification-container" style="position: fixed; top: var(--space-6); right: var(--space-6); z-index: 10000; pointer-events: none;">
+        <!-- Notifications will be inserted here -->
+    </div>
+
+    <!-- Enhanced Templates -->
+    
+    <!-- Enhanced Goal Card Template -->
+    <template id="enhanced-goal-card-template">
+        <div class="enhanced-goal-card" data-goal-id="">
+            <div class="goal-header">
+                <div class="goal-title">
+                    <h3 class="goal-name"></h3>
+                    <div class="goal-avatars-row">
+                        <!-- Child avatars will be inserted here -->
+                    </div>
+                </div>
+                <div class="enhanced-goal-actions">
+                    <button class="action-btn" title="View Details" onclick="openGoalDetail(this.dataset.goalId)">👁️</button>
+                    <button class="action-btn" title="View History" onclick="openCompletionHistory(this.dataset.goalId)">📊</button>
+                    <button class="action-btn" title="Edit Goal" onclick="editGoal(this.dataset.goalId)">✏️</button>
+                    <button class="action-btn" title="Delete Goal" onclick="deleteGoal(this.dataset.goalId)">🗑️</button>
+                    <button class="action-btn complete" title="Complete Goal" onclick="window.GoalarooEnhancements ? window.GoalarooEnhancements.completeGoal(this.dataset.goalId) : completeGoal(this.dataset.goalId)">✅</button>
+                </div>
+            </div>
+
+            <div class="goal-progress-section">
+                <div class="enhanced-progress-circle">
+                    <svg class="progress-ring" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="35" class="progress-track"/>
+                        <circle cx="40" cy="40" r="35" class="progress-bar"/>
+                    </svg>
+                    <div class="progress-center">
+                        <span class="progress-emoji"></span>
+                    </div>
+                </div>
+                <div class="progress-info">
+                    <div class="progress-percentage"></div>
+                    <div class="progress-encouragement"></div>
+                </div>
+            </div>
+
+            <div class="enhanced-story-trail">
+                <div class="story-header">
+                    <h4 class="story-title"></h4>
+                    <p class="story-description"></p>
+                </div>
+                <div class="enhanced-trail-visual">
+                    <div class="trail-progress-bar">
+                        <div class="trail-character"></div>
+                    </div>
+                    <div class="trail-destination"></div>
+                </div>
+                <div class="trail-milestones">
+                    <!-- Milestones will be inserted here -->
+                </div>
+            </div>
+
+            <div class="goal-status">
+                <span class="status-badge"></span>
+                <span class="iteration-info" style="display: none;"></span>
+                <span class="streak-info" style="display: none;"></span>
+                <span class="longest-streak-info" style="display: none;"></span>
+            </div>
+        </div>
+    </template>
+
+    <!-- Enhanced Empty State Template -->
+    <template id="enhanced-empty-state-template">
+        <div class="enhanced-empty-state">
+            <div class="empty-icon-container">
+                <div class="empty-icon">🎯</div>
+                <div class="empty-icon-glow"></div>
+            </div>
+            <h3>Ready for Adventure?</h3>
+            <p>Create your first goal to start an exciting journey! Turn everyday tasks into magical adventures with progress tracking that kids love.</p>
+            <button class="enhanced-cta-btn" onclick="showModal('add-goal-modal')">
+                <span class="btn-shimmer"></span>
+                <span class="btn-content">
+                    <span class="btn-icon">✨</span>
+                    <span class="btn-text">Create First Goal</span>
+                </span>
+            </button>
+        </div>
+    </template>
+
+    <!-- Enhanced Child Avatar Template -->
+    <template id="enhanced-child-avatar-template">
+        <div class="enhanced-child-avatar" data-child-id="">
+            <div class="avatar-circle">
+                <span class="child-emoji"></span>
+            </div>
+            <div class="avatar-name"></div>
+            <button class="child-avatar-edit-btn" onclick="openEditChildModal(this.dataset.child)">
+                ✏️
+            </button>
+        </div>
+    </template>
+
+    <!-- Enhanced Completion Item Template -->
+    <template id="enhanced-completion-item-template">
+        <div class="enhanced-completion-item">
+            <div class="completion-icon">
+                <span class="completion-emoji">✅</span>
+            </div>
+            <div class="completion-details">
+                <div class="completion-date"></div>
+                <div class="completion-time"></div>
+                <div class="completion-notes"></div>
+            </div>
+            <div class="completion-meta">
+                <div class="completion-by"></div>
+                <div class="completion-celebration">🎉</div>
+            </div>
+        </div>
+    </template>
 
     <!-- Network Status -->
     <div id="network-status" class="status online" style="position: fixed; top: 10px; right: 10px; z-index: 1000; padding: 5px 10px; border-radius: 4px; font-size: 12px;">
